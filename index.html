@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0D0F0E">
+  <title>WholesaleLedger</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <div class="offline-banner">Offline mode active. Ledger reads, reviews, and exports continue from this device.</div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-row">
+        <a class="brand" href="index.html" aria-label="WholesaleLedger dashboard">
+          <span class="brand-mark">WL</span>
+          <span class="brand-copy">
+            <span class="brand-title" data-business-name>WholesaleLedger</span>
+            <span class="brand-subtitle" data-business-prefix>Device ledger</span>
+          </span>
+        </a>
+      </div>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="index.html" data-nav="dashboard">Dashboard</a>
+        <a href="clients.html" data-nav="clients">Clients</a>
+        <a href="#" data-open-export>Export</a>
+        <a href="settings.html" data-nav="settings">Settings</a>
+      </nav>
+      <div class="top-actions">
+        <select class="business-select" data-business-select aria-label="Active business"></select>
+        <span class="status-pill is-offline" data-connection-status>
+          <span class="status-dot"></span>
+          <span data-connection-label>Offline</span>
+        </span>
+        <button class="icon-btn hide-on-compact" type="button" data-notification-bell aria-label="Notifications">
+          <span aria-hidden="true">!</span>
+          <span class="notification-count" data-notification-count hidden>0</span>
+        </button>
+        <a class="icon-btn" href="settings.html" aria-label="Settings">
+          <span aria-hidden="true">...</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="page-main dashboard-page">
+      <section class="metrics-grid" aria-label="Ledger metrics">
+        <article class="metric-card" data-tone="blue">
+          <div>
+            <p class="metric-label">Total Outstanding</p>
+            <p class="metric-value amount" data-metric="outstanding" data-value="0">₹0</p>
+          </div>
+          <div class="metric-meta"><span data-metric-count="outstanding">0 entries</span><span class="metric-stem"></span></div>
+        </article>
+        <article class="metric-card" data-tone="red">
+          <div>
+            <p class="metric-label">Overdue</p>
+            <p class="metric-value amount" data-metric="overdue" data-value="0">₹0</p>
+          </div>
+          <div class="metric-meta"><span data-metric-count="overdue">0 entries</span><span class="metric-stem"></span></div>
+        </article>
+        <article class="metric-card" data-tone="amber">
+          <div>
+            <p class="metric-label">Due This Week</p>
+            <p class="metric-value amount" data-metric="week" data-value="0">₹0</p>
+          </div>
+          <div class="metric-meta"><span data-metric-count="week">0 entries</span><span class="metric-stem"></span></div>
+        </article>
+        <article class="metric-card" data-tone="green">
+          <div>
+            <p class="metric-label">Collected This Month</p>
+            <p class="metric-value amount" data-metric="month" data-value="0">₹0</p>
+          </div>
+          <div class="metric-meta"><span data-metric-count="month">0 entries</span><span class="metric-stem"></span></div>
+        </article>
+      </section>
+
+      <div class="dashboard-grid">
+        <div class="dashboard-main">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Ledger Accounts</p>
+                <h1 class="section-title">Client Payment Status</h1>
+              </div>
+              <button class="btn btn-primary" type="button" data-open-export>Export</button>
+            </div>
+            <div class="table-wrap client-table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Client name</th>
+                    <th>Total due</th>
+                    <th>Paid %</th>
+                    <th>Status</th>
+                    <th>Due date</th>
+                    <th>Days</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody data-client-table-body></tbody>
+              </table>
+            </div>
+            <div class="mobile-card-list" data-client-mobile-list></div>
+          </section>
+
+          <section class="panel review-section" data-pending-section hidden>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Needs Review</p>
+                <h2 class="section-title">Pending WhatsApp Extractions</h2>
+              </div>
+            </div>
+            <div class="review-grid" data-pending-review></div>
+          </section>
+        </div>
+
+        <aside class="panel live-feed-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">Live Feed</p>
+              <h2 class="section-title">Incoming Payments</h2>
+            </div>
+          </div>
+          <div class="feed-list" data-live-feed></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="index.html" data-nav="dashboard"><span class="nav-icon" aria-hidden="true">#</span><span>Dashboard</span></a>
+    <a href="clients.html" data-nav="clients"><span class="nav-icon" aria-hidden="true">@</span><span>Clients</span></a>
+    <button type="button" data-open-export><span class="nav-icon" aria-hidden="true">$</span><span>Export</span></button>
+    <a href="settings.html" data-nav="settings"><span class="nav-icon" aria-hidden="true">...</span><span>Settings</span></a>
+  </nav>
+
+  <script src="js/vendor/idb.umd.js"></script>
+  <script src="js/vendor-idb.js"></script>
+  <script src="js/vendor/xlsx.full.min.js"></script>
+  <script src="js/vendor/jspdf.umd.min.js"></script>
+  <script src="js/vendor/jspdf.plugin.autotable.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/sse.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

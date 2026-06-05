@@ -1,0 +1,213 @@
+.detail-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-hero {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.35rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, rgba(212, 144, 10, 0.12), transparent 42%),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.detail-head {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.detail-title {
+  margin: 0;
+  color: var(--ink-strong);
+  font-family: var(--heading);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  line-height: 1.05;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.balance-block {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.balance-label {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.balance-value {
+  margin: 0;
+  color: var(--ink-strong);
+  font-family: var(--heading);
+  font-size: clamp(2rem, 8vw, 4rem);
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.util-row {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.invoice-list,
+.timeline-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.ledger-item {
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.invoice-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.95rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.invoice-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.invoice-main strong {
+  color: var(--ink-strong);
+}
+
+.invoice-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.invoice-amounts {
+  display: grid;
+  gap: 0.18rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.invoice-amounts strong {
+  color: var(--ink-strong);
+  font-family: var(--mono);
+}
+
+.invoice-payments {
+  display: none;
+  padding: 0 0.95rem 0.95rem;
+}
+
+.ledger-item.is-expanded .invoice-payments {
+  display: grid;
+  gap: 0.52rem;
+}
+
+.invoice-payment-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.58rem 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.timeline-item {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.95rem;
+  border-left: 4px solid var(--muted-2);
+  box-shadow: none;
+}
+
+.timeline-item[data-source^="whatsapp"] {
+  border-left-color: var(--green);
+}
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.timeline-head strong {
+  color: var(--ink-strong);
+  font-family: var(--mono);
+}
+
+.timeline-meta,
+.timeline-raw {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.timeline-raw {
+  margin: 0;
+  font-family: var(--mono);
+}
+
+@media (min-width: 900px) {
+  .detail-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+    align-items: end;
+  }
+
+  .detail-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 520px) {
+  .invoice-button,
+  .timeline-head {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .invoice-button {
+    display: grid;
+  }
+
+  .invoice-amounts {
+    text-align: left;
+  }
+}

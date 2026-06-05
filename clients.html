@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0D0F0E">
+  <title>Clients - WholesaleLedger</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/clients.css">
+</head>
+<body>
+  <div class="offline-banner">Offline mode active. Client records are served from this device.</div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-row">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">WL</span>
+          <span class="brand-copy">
+            <span class="brand-title" data-business-name>WholesaleLedger</span>
+            <span class="brand-subtitle" data-business-prefix>Device ledger</span>
+          </span>
+        </a>
+      </div>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="index.html" data-nav="dashboard">Dashboard</a>
+        <a href="clients.html" data-nav="clients">Clients</a>
+        <a href="#" data-open-export>Export</a>
+        <a href="settings.html" data-nav="settings">Settings</a>
+      </nav>
+      <div class="top-actions">
+        <select class="business-select" data-business-select aria-label="Active business"></select>
+        <span class="status-pill is-offline" data-connection-status>
+          <span class="status-dot"></span>
+          <span data-connection-label>Offline</span>
+        </span>
+        <button class="icon-btn hide-on-compact" type="button" data-notification-bell aria-label="Notifications">
+          <span aria-hidden="true">!</span>
+          <span class="notification-count" data-notification-count hidden>0</span>
+        </button>
+        <a class="icon-btn" href="settings.html" aria-label="Settings"><span aria-hidden="true">...</span></a>
+      </div>
+    </header>
+
+    <main class="page-main clients-page">
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Account Book</p>
+            <h1 class="section-title">Clients</h1>
+          </div>
+          <select class="sort-control" data-client-sort aria-label="Sort clients">
+            <option value="amount">Sort by amount</option>
+            <option value="name">Sort by name</option>
+            <option value="due">Sort by due date</option>
+            <option value="last_payment">Sort by last payment</option>
+          </select>
+        </div>
+        <div class="clients-toolbar">
+          <input class="search-input" type="search" data-client-search placeholder="Search clients or phone numbers" aria-label="Search clients">
+          <div class="filter-row" role="tablist" aria-label="Client filters">
+            <button class="filter-tab is-active" type="button" data-filter="all">All</button>
+            <button class="filter-tab" type="button" data-filter="overdue">Overdue</button>
+            <button class="filter-tab" type="button" data-filter="due_soon">Due Soon</button>
+            <button class="filter-tab" type="button" data-filter="paid">Paid</button>
+            <button class="filter-tab" type="button" data-filter="partial">Partial</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="clients-grid" data-clients-grid aria-live="polite"></section>
+    </main>
+  </div>
+
+  <button class="fab" type="button" data-add-client>Add Client</button>
+
+  <div class="modal-backdrop" id="addClientModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 class="modal-title">Add Client</h2>
+        <button class="icon-btn" type="button" data-close-modal aria-label="Close add client modal">&times;</button>
+      </div>
+      <form class="modal-body form-grid">
+        <div class="field">
+          <label for="clientName">Name</label>
+          <input class="field-control" id="clientName" name="name" required>
+        </div>
+        <div class="field">
+          <label for="clientPhone">Phone</label>
+          <input class="field-control" id="clientPhone" name="phone" type="tel" required>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="creditLimit">Credit limit</label>
+            <input class="field-control" id="creditLimit" name="credit_limit" type="number" min="0" step="1" required>
+          </div>
+          <div class="field">
+            <label for="cycleDays">Payment cycle days</label>
+            <select class="field-control" id="cycleDays" name="payment_cycle_days">
+              <option value="7">7</option>
+              <option value="15">15</option>
+              <option value="30">30</option>
+              <option value="45">45</option>
+            </select>
+          </div>
+        </div>
+      </form>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
+        <button class="btn btn-primary" type="button" data-save-client>Save Client</button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a href="index.html" data-nav="dashboard"><span class="nav-icon" aria-hidden="true">#</span><span>Dashboard</span></a>
+    <a href="clients.html" data-nav="clients"><span class="nav-icon" aria-hidden="true">@</span><span>Clients</span></a>
+    <button type="button" data-open-export><span class="nav-icon" aria-hidden="true">$</span><span>Export</span></button>
+    <a href="settings.html" data-nav="settings"><span class="nav-icon" aria-hidden="true">...</span><span>Settings</span></a>
+  </nav>
+
+  <script src="js/vendor/idb.umd.js"></script>
+  <script src="js/vendor-idb.js"></script>
+  <script src="js/vendor/xlsx.full.min.js"></script>
+  <script src="js/vendor/jspdf.umd.min.js"></script>
+  <script src="js/vendor/jspdf.plugin.autotable.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/notify.js"></script>
+  <script src="js/export.js"></script>
+  <script src="js/sse.js"></script>
+  <script src="js/clients.js"></script>
+</body>
+</html>
