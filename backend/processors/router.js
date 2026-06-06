@@ -40,7 +40,15 @@ export async function processTextMessage(text, context = {}) {
   }
 
   const match = extraction.client_name ? store.matchClient(extraction.client_name) : { client: null, score: 0 };
-  const client = match.score > 0.8 ? match.client : null;
+  let client = match.score > 0.8 ? match.client : null;
+  if (!client && extraction.client_name) {
+    client = store.addClient({
+      name: extraction.client_name,
+      phone: ""
+    });
+    match.score = 1;
+    match.client = client;
+  }
   const prefixBoost = routed.businessPrefix && client ? 0.18 : 0;
   const confidence = Math.min(1, (Number(extraction.confidence || 0) + prefixBoost) * (client ? 1 : 0.72));
   const status = confidence >= 0.85 && client ? "confirmed" : "pending_review";

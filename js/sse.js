@@ -191,7 +191,14 @@
     if (data.business_prefix && business?.prefix && data.business_prefix !== business.prefix) return null;
 
     let clientId = data.client_id || null;
-    let matchedClient = clientId ? await window.WLDB.getClient(clientId) : null;
+    let matchedClient = null;
+    if (clientId) {
+      matchedClient = await window.WLDB.getClient(clientId);
+      if (!matchedClient) {
+        await window.WLDB.pullSync();
+        matchedClient = await window.WLDB.getClient(clientId);
+      }
+    }
     let matchScore = matchedClient ? 1 : 0;
 
     if (!matchedClient && data.client_name) {
@@ -243,7 +250,14 @@
     if (data.business_prefix && business?.prefix && data.business_prefix !== business.prefix) return null;
 
     let clientId = data.client_id || null;
-    let matchedClient = clientId ? await window.WLDB.getClient(clientId) : null;
+    let matchedClient = null;
+    if (clientId) {
+      matchedClient = await window.WLDB.getClient(clientId);
+      if (!matchedClient) {
+        await window.WLDB.pullSync();
+        matchedClient = await window.WLDB.getClient(clientId);
+      }
+    }
     let matchScore = matchedClient ? 1 : 0;
 
     if (!matchedClient && data.client_name) {
