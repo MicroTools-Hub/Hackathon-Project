@@ -106,15 +106,67 @@ function openLedgerDb() {
   });
 }
 
+async function getApiBaseUrl(db) {
+  const settings = await getByKey(db, "settings", "global");
+  if (!settings || !settings.sse_endpoint) return "";
+  return settings.sse_endpoint.replace(/\/sse\/?$/, "");
+}
+
+function getByKey(db, storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readonly");
+    const request = tx.objectStore(storeName).get(key);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
 async function markQueuedActionsSynced() {
   const db = await openLedgerDb();
   const queued = await getAll(db, "sync_queue");
+  const apiBase = await getApiBaseUrl(db);
+  if (!apiBase) {
+    console.warn("[SW] No API base URL found in settings, skipping sync");
+    return;
+  }
   const tx = db.transaction("sync_queue", "readwrite");
-  queued
-    .filter((item) => item.status === "queued")
-    .forEach((item) => {
-      tx.objectStore("sync_queue").put({ ...item, status: "synced", synced_at: Date.now() });
-    });
+  const store = tx.objectStore("sync_queue");
+  for (const item of queued) {
+    if (item.status !== "queued") continue;
+    try {
+      let url = "";
+      let options = {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      };
+      if (item.type === "client_added") {
+        url = `${apiBase}/api/clients`;
+        options.method = "POST";
+        options.body = JSON.stringify(item.payload);
+      } else if (item.type === "payment_added") {
+        url = `${apiBase}/api/payments`;
+        options.method = "POST";
+        options.body = JSON.stringify(item.payload);
+      } else if (item.type === "payment_confirmed") {
+        url = `${apiBase}/api/payments/${item.payload.id}/confirm`;
+        options.method = "PUT";
+        options.body = JSON.stringify(item.payload);
+      } else if (item.type === "payment_discarded") {
+        url = `${apiBase}/api/payments/${item.payload.payment_id}`;
+        options.method = "DELETE";
+      }
+      if (url) {
+        console.log(`[SW] Syncing action ${item.type} to ${url}...`);
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}`);
+        }
+        await store.put({ ...item, status: "synced", synced_at: Date.now() });
+      }
+    } catch (error) {
+      console.error(`[SW] Failed to sync action ${item.type}:`, error);
+    }
+  }
   await transactionDone(tx);
 }
 

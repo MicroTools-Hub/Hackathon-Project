@@ -2,7 +2,10 @@
   const DB_NAME = "WholesaleLedgerDB";
   const DB_VERSION = 1;
   const DAY = 24 * 60 * 60 * 1000;
-  const DEFAULT_SSE_ENDPOINT = "https://ecological-discs-dominant-dvd.trycloudflare.com/sse";
+  const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
+  const DEFAULT_SSE_ENDPOINT = isLocalHost
+    ? "http://127.0.0.1:3000/sse"
+    : "https://ecological-discs-dominant-dvd.trycloudflare.com/sse";
   const STORES = ["businesses", "clients", "invoices", "payments", "settings", "sync_queue"];
   let dbPromise;
   let seedPromise;
@@ -14,6 +17,129 @@
       const resolved = char === "x" ? value : (value & 0x3) | 0x8;
       return resolved.toString(16);
     });
+  }
+
+  async function getApiBaseUrl() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600);
+      const res = await fetch("http://127.0.0.1:3000/api/health", { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) return "http://127.0.0.1:3000";
+    } catch (e) {}
+
+    const settings = await getSettings();
+    if (!settings || !settings.sse_endpoint) return "";
+    return settings.sse_endpoint.replace(/\/sse\/?$/, "");
+  }
+
+  async function apiFetch(path, options = {}) {
+    const baseUrl = await getApiBaseUrl();
+    if (!baseUrl) {
+      console.warn("No API base URL configured, skipping fetch for", path);
+      return null;
+    }
+    const url = `${baseUrl}${path}`;
+    const defaultHeaders = {
+      "Content-Type": "application/json"
+    };
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...defaultHeaders,
+          ...options.headers
+        }
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API error ${response.status}: ${errorText || response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("API call failed:", error);
+      throw error;
+    }
+  }
+
+  async function pullSync() {
+    if (!navigator.onLine) {
+      console.warn("Offline, skipping pull sync");
+      return;
+    }
+    try {
+      console.log("Starting pull sync...");
+      const businessData = await apiFetch("/api/business");
+      const clientsData = await apiFetch("/api/clients");
+      const txData = await apiFetch("/api/transactions");
+      if (!businessData || !clientsData || !txData) {
+        console.warn("Pull sync fetched empty data, aborting");
+        return;
+      }
+      const db = await openDatabase();
+      const tx = db.transaction(["businesses", "clients", "invoices", "payments"], "readwrite");
+      const bStore = tx.objectStore("businesses");
+      await bStore.clear();
+      await bStore.put(businessData.business);
+      const cStore = tx.objectStore("clients");
+      await cStore.clear();
+      for (const client of clientsData.clients) {
+        await cStore.put(client);
+      }
+      const iStore = tx.objectStore("invoices");
+      const pStore = tx.objectStore("payments");
+      await iStore.clear();
+      await pStore.clear();
+      for (const trans of txData.transactions) {
+        if (trans.type === "goods") {
+          const invoice = {
+            id: trans.transaction_id || trans.id,
+            business_id: trans.business_id || businessData.business.id,
+            client_id: trans.client_id,
+            amount: Number(trans.amount) || 0,
+            due_date: Number(trans.due_date_at_transaction || trans.recorded_at + 30 * DAY),
+            created_at: Number(trans.recorded_at),
+            notes: trans.description || trans.raw_input || "WhatsApp goods entry",
+            status: trans.status || "confirmed",
+            source: trans.source || "whatsapp_text",
+            source_number: trans.source_number || "",
+            raw_input: trans.raw_input || "",
+            confidence: Number(trans.confidence ?? 1),
+            transaction_id: trans.transaction_id || trans.id || null,
+            business_prefix: trans.business_prefix || null,
+            client_name: trans.client_name || ""
+          };
+          await iStore.put(invoice);
+        } else if (trans.type === "payment") {
+          const payment = {
+            id: trans.id,
+            business_id: trans.business_id || businessData.business.id,
+            client_id: trans.client_id,
+            invoice_id: trans.invoice_id || null,
+            amount: Number(trans.amount) || 0,
+            mode: trans.mode || "unknown",
+            recorded_at: Number(trans.recorded_at),
+            source: trans.source || "manual",
+            source_number: trans.source_number || "",
+            raw_input: trans.raw_input || "",
+            confidence: Number(trans.confidence ?? 1),
+            status: trans.status || "confirmed",
+            utr_number: trans.utr_number || null,
+            notes: trans.notes || "",
+            business_prefix: trans.business_prefix || null,
+            client_name: trans.client_name || "",
+            match_score: Number(trans.match_score ?? 1)
+          };
+          await pStore.put(payment);
+        }
+      }
+      await tx.done;
+      await refreshInvoiceStatuses(businessData.business.id);
+      console.log("Pull sync completed successfully!");
+      window.dispatchEvent(new CustomEvent("wl:sync-completed"));
+    } catch (error) {
+      console.error("Pull sync failed:", error);
+    }
   }
 
   function openDatabase() {
@@ -63,6 +189,9 @@
     const db = await openDatabase();
     if (!seedPromise) seedPromise = seedIfNeeded();
     await seedPromise;
+    if (navigator.onLine) {
+      pullSync().catch(console.error);
+    }
     return db;
   }
 
@@ -235,9 +364,18 @@
   async function getSettings() {
     const db = await init();
     const settings = await db.get("settings", "global");
+    const resolvedDefaultEndpoint = isLocalHost
+      ? "http://127.0.0.1:3000/sse"
+      : DEFAULT_SSE_ENDPOINT;
+
     if (settings) {
+      // If on localhost and the endpoint is pointing to trycloudflare, override it to local backend
+      if (isLocalHost && settings.sse_endpoint && settings.sse_endpoint.includes("trycloudflare.com")) {
+        settings.sse_endpoint = "http://127.0.0.1:3000/sse";
+        await db.put("settings", settings);
+      }
       if (!settings.sse_endpoint && !settings.sse_endpoint_manual_clear) {
-        const next = { ...settings, sse_endpoint: DEFAULT_SSE_ENDPOINT, sse_endpoint_manual_clear: false };
+        const next = { ...settings, sse_endpoint: resolvedDefaultEndpoint, sse_endpoint_manual_clear: false };
         await db.put("settings", next);
         return next;
       }
@@ -246,7 +384,7 @@
     const businesses = await db.getAll("businesses");
     const fallback = {
       id: "global",
-      sse_endpoint: DEFAULT_SSE_ENDPOINT,
+      sse_endpoint: resolvedDefaultEndpoint,
       sse_endpoint_manual_clear: false,
       active_business_id: businesses[0]?.id || null,
       theme: "dark",
@@ -307,7 +445,7 @@
     const db = await init();
     const businessId = data.business_id || await getActiveBusinessId();
     const client = {
-      id: uuid(),
+      id: data.id || uuid(),
       business_id: businessId,
       name: data.name.trim(),
       phone: data.phone.trim(),
@@ -316,6 +454,19 @@
       created_at: Date.now()
     };
     await db.put("clients", client);
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/clients", {
+          method: "POST",
+          body: JSON.stringify(client)
+        });
+      } catch (error) {
+        console.warn("Failed to push client to server, queueing:", error);
+        await queueSyncAction("client_added", client);
+      }
+    } else {
+      await queueSyncAction("client_added", client);
+    }
     return client;
   }
 
@@ -516,7 +667,19 @@
     };
     await db.put("payments", payment);
     await refreshInvoiceStatuses(businessId);
-    if (!navigator.onLine && status === "confirmed") await queueSyncAction("payment_confirmed", { payment_id: payment.id });
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/payments", {
+          method: "POST",
+          body: JSON.stringify(payment)
+        });
+      } catch (error) {
+        console.warn("Failed to push payment to server, queuing:", error);
+        await queueSyncAction("payment_added", payment);
+      }
+    } else {
+      await queueSyncAction("payment_added", payment);
+    }
     return payment;
   }
 
@@ -546,7 +709,19 @@
     }
     await db.put("payments", next);
     await refreshInvoiceStatuses(next.business_id);
-    if (!navigator.onLine) await queueSyncAction("payment_confirmed", { payment_id: next.id });
+    if (navigator.onLine) {
+      try {
+        await apiFetch(`/api/payments/${id}/confirm`, {
+          method: "PUT",
+          body: JSON.stringify(next)
+        });
+      } catch (error) {
+        console.warn("Failed to push confirm payment to server, queuing:", error);
+        await queueSyncAction("payment_confirmed", next);
+      }
+    } else {
+      await queueSyncAction("payment_confirmed", next);
+    }
     return next;
   }
 
@@ -556,7 +731,18 @@
     await db.delete("payments", id);
     if (current) {
       await refreshInvoiceStatuses(current.business_id);
-      if (!navigator.onLine) await queueSyncAction("payment_discarded", { payment_id: id });
+      if (navigator.onLine) {
+        try {
+          await apiFetch(`/api/payments/${id}`, {
+            method: "DELETE"
+          });
+        } catch (error) {
+          console.warn("Failed to push discard payment to server, queuing:", error);
+          await queueSyncAction("payment_discarded", { payment_id: id });
+        }
+      } else {
+        await queueSyncAction("payment_discarded", { payment_id: id });
+      }
     }
   }
 
@@ -591,6 +777,16 @@
     await db.put("businesses", nextBusiness);
     if (patch.currency_symbol) await saveSettings({ currency_symbol: patch.currency_symbol.trim() });
     if (patch.theme) await saveSettings({ theme: patch.theme });
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/business", {
+          method: "PUT",
+          body: JSON.stringify(nextBusiness)
+        });
+      } catch (error) {
+        console.warn("Failed to push business setup to server:", error);
+      }
+    }
     return nextBusiness;
   }
 
@@ -605,6 +801,16 @@
     }
     const next = { ...business, trusted_numbers: numbers, trusted_number_meta: meta };
     await db.put("businesses", next);
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/trusted-numbers", {
+          method: "POST",
+          body: JSON.stringify({ phone: cleanPhone })
+        });
+      } catch (error) {
+        console.warn("Failed to push trusted number to server:", error);
+      }
+    }
     return next;
   }
 
@@ -617,6 +823,15 @@
       trusted_number_meta: (business.trusted_number_meta || []).filter((item) => item.phone !== phone)
     };
     await db.put("businesses", next);
+    if (navigator.onLine) {
+      try {
+        await apiFetch(`/api/trusted-numbers/${encodeURIComponent(phone)}`, {
+          method: "DELETE"
+        });
+      } catch (error) {
+        console.warn("Failed to remove trusted number on server:", error);
+      }
+    }
     return next;
   }
 
@@ -863,6 +1078,7 @@
 
   window.WLDB = {
     init,
+    pullSync,
     uuid,
     getSettings,
     saveSettings,

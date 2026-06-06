@@ -32,6 +32,9 @@
     };
     window.addEventListener("wl:payment", refreshFromLedgerEvent);
     window.addEventListener("wl:ledger-entry", refreshFromLedgerEvent);
+    window.addEventListener("wl:sync-completed", async () => {
+      await renderDashboard();
+    });
   }
 
   async function renderDashboard() {

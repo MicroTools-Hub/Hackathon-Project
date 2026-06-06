@@ -9,8 +9,18 @@
     await window.WLDB.init();
     const settings = await window.WLDB.getSettings();
     stop();
-    if (settings.sse_endpoint && navigator.onLine) {
-      connect(settings.sse_endpoint);
+
+    let endpoint = settings.sse_endpoint;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600);
+      const res = await fetch("http://127.0.0.1:3000/api/health", { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) endpoint = "http://127.0.0.1:3000/sse";
+    } catch (e) {}
+
+    if (endpoint && navigator.onLine) {
+      connect(endpoint);
       return;
     }
     if (isDevelopment()) startSimulator();
@@ -39,6 +49,9 @@
       retryDelay = 1000;
       setStatus("live", "Live");
       await window.WLDB.appendConnectionLog("SSE connection opened", "success");
+      if (window.WLDB && window.WLDB.pullSync) {
+        window.WLDB.pullSync().catch(console.error);
+      }
     };
 
     eventSource.addEventListener("payment", (event) => {
