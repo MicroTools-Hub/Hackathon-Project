@@ -2,6 +2,7 @@
   const DB_NAME = "WholesaleLedgerDB";
   const DB_VERSION = 1;
   const DAY = 24 * 60 * 60 * 1000;
+  const DEFAULT_SSE_ENDPOINT = "https://ecological-discs-dominant-dvd.trycloudflare.com/sse";
   const STORES = ["businesses", "clients", "invoices", "payments", "settings", "sync_queue"];
   let dbPromise;
   let seedPromise;
@@ -207,7 +208,8 @@
 
     const settings = {
       id: "global",
-      sse_endpoint: "",
+      sse_endpoint: DEFAULT_SSE_ENDPOINT,
+      sse_endpoint_manual_clear: false,
       active_business_id: business.id,
       theme: "dark",
       currency_symbol: "₹",
@@ -233,11 +235,19 @@
   async function getSettings() {
     const db = await init();
     const settings = await db.get("settings", "global");
-    if (settings) return settings;
+    if (settings) {
+      if (!settings.sse_endpoint && !settings.sse_endpoint_manual_clear) {
+        const next = { ...settings, sse_endpoint: DEFAULT_SSE_ENDPOINT, sse_endpoint_manual_clear: false };
+        await db.put("settings", next);
+        return next;
+      }
+      return settings;
+    }
     const businesses = await db.getAll("businesses");
     const fallback = {
       id: "global",
-      sse_endpoint: "",
+      sse_endpoint: DEFAULT_SSE_ENDPOINT,
+      sse_endpoint_manual_clear: false,
       active_business_id: businesses[0]?.id || null,
       theme: "dark",
       currency_symbol: "₹",
@@ -251,6 +261,9 @@
     const db = await init();
     const settings = await getSettings();
     const next = { ...settings, ...patch };
+    if (Object.prototype.hasOwnProperty.call(patch, "sse_endpoint")) {
+      next.sse_endpoint_manual_clear = !patch.sse_endpoint;
+    }
     await db.put("settings", next);
     return next;
   }
@@ -442,6 +455,36 @@
     if (!clientId) return null;
     const openInvoices = await getOpenInvoicesForClient(clientId);
     return openInvoices[0]?.id || null;
+  }
+
+  async function addInvoice(data) {
+    const db = await init();
+    const businessId = data.business_id || await getActiveBusinessId();
+    const clientId = data.client_id || null;
+    const recordedAt = Number(data.recorded_at) || Date.now();
+    const client = clientId ? await getClient(clientId) : null;
+    const dueDate = Number(data.due_date || data.due_date_at_transaction)
+      || recordedAt + Number(client?.payment_cycle_days || 30) * DAY;
+    const invoice = {
+      id: data.id || data.transaction_id || uuid(),
+      business_id: businessId,
+      client_id: clientId,
+      amount: Number(data.amount) || 0,
+      due_date: dueDate,
+      created_at: recordedAt,
+      notes: data.description || data.raw_input || data.notes || "WhatsApp goods entry",
+      status: data.status === "confirmed" ? "active" : "pending_review",
+      source: data.source || "whatsapp_text",
+      source_number: data.source_number || "",
+      raw_input: data.raw_input || "",
+      confidence: Number(data.confidence ?? 1),
+      transaction_id: data.transaction_id || data.id || null,
+      business_prefix: data.business_prefix || null,
+      client_name: data.client_name || ""
+    };
+    await db.put("invoices", invoice);
+    await refreshInvoiceStatuses(businessId);
+    return invoice;
   }
 
   async function addPayment(data) {
@@ -838,6 +881,7 @@
     getOpenInvoicesForClient,
     computeClientSummaries,
     computeMetrics,
+    addInvoice,
     addPayment,
     updatePayment,
     confirmPayment,

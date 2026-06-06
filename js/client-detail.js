@@ -26,14 +26,19 @@
       const invoice = event.target.closest("[data-invoice-toggle]");
       if (invoice) invoice.closest(".ledger-item").classList.toggle("is-expanded");
     });
-    window.addEventListener("wl:payment", async (event) => {
-      if (event.detail?.payment?.client_id === state.clientId) {
+    const refreshFromLedgerEvent = async (event) => {
+      const clientId = event.detail?.payment?.client_id
+        || event.detail?.invoice?.client_id
+        || event.detail?.transaction?.client_id;
+      if (clientId === state.clientId) {
         await loadAndRender();
         document.querySelectorAll(".ledger-item, .timeline-item").forEach((node, index) => {
           if (index < 2) node.classList.add("row-flash");
         });
       }
-    });
+    };
+    window.addEventListener("wl:payment", refreshFromLedgerEvent);
+    window.addEventListener("wl:ledger-entry", refreshFromLedgerEvent);
   }
 
   async function loadAndRender() {

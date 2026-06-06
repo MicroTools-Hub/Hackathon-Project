@@ -38,9 +38,11 @@
     document.querySelector("[data-add-client]")?.addEventListener("click", openAddClientModal);
     document.querySelector("[data-save-client]")?.addEventListener("click", saveClient);
     document.addEventListener("click", handleCardAction);
-    window.addEventListener("wl:payment", async () => {
+    const refreshFromLedgerEvent = async () => {
       await loadAndRender();
-    });
+    };
+    window.addEventListener("wl:payment", refreshFromLedgerEvent);
+    window.addEventListener("wl:ledger-entry", refreshFromLedgerEvent);
   }
 
   async function loadAndRender() {

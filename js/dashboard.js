@@ -23,11 +23,15 @@
 
   function bindDashboardEvents() {
     document.addEventListener("click", handleClick);
-    window.addEventListener("wl:payment", async (event) => {
+    const refreshFromLedgerEvent = async (event) => {
       await renderDashboard();
-      const clientId = event.detail?.payment?.client_id;
+      const clientId = event.detail?.payment?.client_id
+        || event.detail?.invoice?.client_id
+        || event.detail?.transaction?.client_id;
       if (clientId) flashClientRow(clientId);
-    });
+    };
+    window.addEventListener("wl:payment", refreshFromLedgerEvent);
+    window.addEventListener("wl:ledger-entry", refreshFromLedgerEvent);
   }
 
   async function renderDashboard() {

@@ -45,6 +45,10 @@
       safelyHandlePayment(parseEventData(event));
     });
 
+    eventSource.addEventListener("transaction", (event) => {
+      safelyHandleTransaction(parseEventData(event));
+    });
+
     eventSource.onmessage = (event) => {
       routeServerEvent(parseEventData(event));
     };
@@ -95,14 +99,29 @@
     });
   }
 
+  function safelyHandleTransaction(payload) {
+    handleTransaction(payload).catch((error) => {
+      console.error("Transaction event failed", error);
+      window.WLNotify.error("Transaction event failed", error.message);
+    });
+  }
+
   function routeServerEvent(payload) {
     const type = payload?.type;
     const data = payload?.data || payload || {};
     if (type === "payment") {
       safelyHandlePayment(payload);
+    } else if (type === "transaction") {
+      safelyHandleTransaction(payload);
     } else if (type === "reminder") {
       window.WLNotify.info("Reminder sent", data?.client_name || "WhatsApp delivery confirmed");
       window.dispatchEvent(new CustomEvent("wl:reminder", { detail: data }));
+    } else if (type === "credit_limit_alert") {
+      window.WLNotify.warning("Credit limit alert", data?.message || "Owner approval is required");
+      window.dispatchEvent(new CustomEvent("wl:credit-limit-alert", { detail: data }));
+    } else if (type === "rating_alert") {
+      window.WLNotify.warning("Client rating changed", data?.client_name || "A client moved to risky");
+      window.dispatchEvent(new CustomEvent("wl:rating-alert", { detail: data }));
     } else if (type === "error") {
       window.WLNotify.error("Extraction failed", data?.message || "AI extraction could not be completed");
       window.dispatchEvent(new CustomEvent("wl:sse-error", { detail: data }));
@@ -161,6 +180,54 @@
       detail: { payment, client: matchedClient, status, reviewNeeded: status === "pending_review" }
     }));
     return payment;
+  }
+
+  async function handleTransaction(payload) {
+    const data = payload?.data || payload || {};
+    if (data.type === "payment") return handlePayment(data);
+    if (data.type !== "goods") return null;
+
+    const business = await window.WLDB.getActiveBusiness();
+    if (data.business_prefix && business?.prefix && data.business_prefix !== business.prefix) return null;
+
+    let clientId = data.client_id || null;
+    let matchedClient = clientId ? await window.WLDB.getClient(clientId) : null;
+    let matchScore = matchedClient ? 1 : 0;
+
+    if (!matchedClient && data.client_name) {
+      const match = await window.WLDB.fuzzyMatchClient(data.client_name, business?.id);
+      matchedClient = match.score > 0.8 ? match.client : null;
+      clientId = matchedClient?.id || null;
+      matchScore = match.score;
+    }
+
+    const confidence = Number(data.confidence ?? 0);
+    const status = data.status || (confidence >= 0.85 && clientId ? "confirmed" : "pending_review");
+    const amount = window.WLDB.formatCurrency(Number(data.amount) || 0, (await window.WLDB.getSettings()).currency_symbol);
+
+    if (status !== "confirmed" || !clientId) {
+      window.WLNotify.warning("Goods entry needs review", `${amount} for ${data.client_name || "unknown client"}`);
+      window.dispatchEvent(new CustomEvent("wl:ledger-entry", {
+        detail: { transaction: data, client: matchedClient, status, reviewNeeded: true }
+      }));
+      return null;
+    }
+
+    const invoice = await window.WLDB.addInvoice({
+      ...data,
+      id: data.transaction_id || data.id,
+      business_id: business?.id,
+      client_id: clientId,
+      client_name: data.client_name || matchedClient?.name || "",
+      match_score: matchScore,
+      status: "confirmed"
+    });
+
+    window.WLNotify.success("Goods recorded", `${amount} for ${matchedClient?.name || data.client_name}`);
+    window.dispatchEvent(new CustomEvent("wl:ledger-entry", {
+      detail: { type: "goods", transaction: data, invoice, client: matchedClient, status: "confirmed" }
+    }));
+    return invoice;
   }
 
   async function startSimulator() {
