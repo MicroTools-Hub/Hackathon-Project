@@ -548,6 +548,9 @@
     };
     await db.put("payments", payment);
     await refreshInvoiceStatuses(businessId);
+    if (data.skipPush) {
+      return payment;
+    }
     if (navigator.onLine) {
       try {
         await apiFetch("/api/payments", {

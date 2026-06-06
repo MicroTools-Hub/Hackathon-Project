@@ -179,7 +179,8 @@
       status,
       utr_number: data.utr_number || null,
       business_prefix: data.business_prefix || null,
-      match_score: matchScore
+      match_score: matchScore,
+      skipPush: true
     });
 
     const amount = window.WLDB.formatCurrency(payment.amount, (await window.WLDB.getSettings()).currency_symbol);
