@@ -230,7 +230,7 @@
 
     const reviewAction = event.target.closest("[data-review-action]");
     if (reviewAction) {
-      const payment = state.pending.find((item) => item.id === reviewAction.dataset.paymentId);
+      const payment = state.pending.find((item) => String(item.id) === reviewAction.dataset.paymentId);
       if (!payment) return;
       if (reviewAction.dataset.reviewAction === "confirm") await confirmReviewPayment(payment);
       if (reviewAction.dataset.reviewAction === "edit") await openReviewModal(payment);
@@ -257,9 +257,14 @@
   }
 
   async function discardReviewPayment(payment) {
-    await window.WLDB.discardPayment(payment.id);
-    window.WLNotify.info("Payment discarded", money(payment.amount));
-    await renderDashboard();
+    try {
+      await window.WLDB.discardPayment(payment.id);
+      window.WLNotify.info("Payment discarded", money(payment.amount));
+      await renderDashboard();
+    } catch (error) {
+      console.error("Failed to discard payment:", error);
+      window.WLNotify.error("Failed to discard payment", error.message);
+    }
   }
 
   async function openPaymentModal(clientId) {

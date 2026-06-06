@@ -1,4 +1,4 @@
-const CACHE_NAME = "wholesaleledger-static-v7";
+const CACHE_NAME = "wholesaleledger-static-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -147,24 +147,26 @@ async function markQueuedActionsSynced() {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       };
-      if (item.type === "client_added") {
+      const actionType = item.type || item.action;
+      const actionData = item.payload || item.data;
+      if (actionType === "client_added") {
         url = `${apiBase}/api/clients`;
         options.method = "POST";
-        options.body = JSON.stringify(item.payload);
-      } else if (item.type === "payment_added") {
+        options.body = JSON.stringify(actionData);
+      } else if (actionType === "payment_added") {
         url = `${apiBase}/api/payments`;
         options.method = "POST";
-        options.body = JSON.stringify(item.payload);
-      } else if (item.type === "payment_confirmed") {
-        url = `${apiBase}/api/payments/${item.payload.id}/confirm`;
+        options.body = JSON.stringify(actionData);
+      } else if (actionType === "payment_confirmed") {
+        url = `${apiBase}/api/payments/${actionData.id || actionData.payment_id}/confirm`;
         options.method = "PUT";
-        options.body = JSON.stringify(item.payload);
-      } else if (item.type === "payment_discarded") {
-        url = `${apiBase}/api/payments/${item.payload.payment_id}`;
+        options.body = JSON.stringify(actionData);
+      } else if (actionType === "payment_discarded") {
+        url = `${apiBase}/api/payments/${actionData.payment_id || actionData.id}`;
         options.method = "DELETE";
       }
       if (url) {
-        console.log(`[SW] Syncing action ${item.type} to ${url}...`);
+        console.log(`[SW] Syncing action ${actionType} to ${url}...`);
         const response = await fetch(url, options);
         if (!response.ok) {
           throw new Error(`Server returned ${response.status}`);
@@ -172,7 +174,7 @@ async function markQueuedActionsSynced() {
         await store.put({ ...item, status: "synced", synced_at: Date.now() });
       }
     } catch (error) {
-      console.error(`[SW] Failed to sync action ${item.type}:`, error);
+      console.error(`[SW] Failed to sync action ${item.type || item.action}:`, error);
     }
   }
   await transactionDone(tx);

@@ -211,6 +211,7 @@
     const confidence = Number(data.confidence ?? 0);
     const status = confidence >= 0.85 && clientId ? "confirmed" : "pending_review";
     const payment = await window.WLDB.addPayment({
+      id: data.id || data.payment_id || data.transaction_id || null,
       business_id: business?.id,
       client_id: clientId,
       client_name: data.client_name || matchedClient?.name || "",
