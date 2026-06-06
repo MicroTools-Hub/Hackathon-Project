@@ -185,14 +185,20 @@
     return dbPromise;
   }
 
+  let initPromise;
   async function init() {
-    const db = await openDatabase();
-    if (!seedPromise) seedPromise = seedIfNeeded();
-    await seedPromise;
-    if (navigator.onLine) {
-      pullSync().catch(console.error);
+    if (!initPromise) {
+      initPromise = (async () => {
+        const db = await openDatabase();
+        if (!seedPromise) seedPromise = seedIfNeeded();
+        await seedPromise;
+        if (navigator.onLine) {
+          pullSync().catch(console.error);
+        }
+        return db;
+      })();
     }
-    return db;
+    return initPromise;
   }
 
   async function seedIfNeeded() {
@@ -201,139 +207,15 @@
     if (count > 0) return;
 
     const now = Date.now();
-    const at = (days, hour = 10, minute = 0) => {
-      const date = new Date();
-      date.setHours(hour, minute, 0, 0);
-      date.setDate(date.getDate() + days);
-      return date.getTime();
-    };
 
     const business = {
       id: uuid(),
-      name: "Ramesh Traders",
-      prefix: "RAM",
-      trusted_numbers: ["+919876500001", "+919876500002"],
-      trusted_number_meta: [
-        {
-          phone: "+919876500001",
-          label: "Owner",
-          active: true,
-          last_message_at: at(-1, 11, 32),
-          created_at: now
-        },
-        {
-          phone: "+919876500002",
-          label: "Manager",
-          active: true,
-          last_message_at: at(-3, 17, 5),
-          created_at: now
-        }
-      ],
+      name: "New Business",
+      prefix: "NEW",
+      trusted_numbers: [],
+      trusted_number_meta: [],
       created_at: now
     };
-
-    const clients = [
-      {
-        id: uuid(),
-        business_id: business.id,
-        name: "Sharma General Store",
-        phone: "+919890001111",
-        credit_limit: 100000,
-        payment_cycle_days: 7,
-        created_at: at(-90)
-      },
-      {
-        id: uuid(),
-        business_id: business.id,
-        name: "Kiran Textiles",
-        phone: "+919890002222",
-        credit_limit: 120000,
-        payment_cycle_days: 30,
-        created_at: at(-120)
-      },
-      {
-        id: uuid(),
-        business_id: business.id,
-        name: "Patel Merchants",
-        phone: "+919890003333",
-        credit_limit: 180000,
-        payment_cycle_days: 15,
-        created_at: at(-75)
-      },
-      {
-        id: uuid(),
-        business_id: business.id,
-        name: "National Electricals",
-        phone: "+919890004444",
-        credit_limit: 150000,
-        payment_cycle_days: 30,
-        created_at: at(-180)
-      },
-      {
-        id: uuid(),
-        business_id: business.id,
-        name: "Ravi Bros Hardware",
-        phone: "+919890005555",
-        credit_limit: 90000,
-        payment_cycle_days: 15,
-        created_at: at(-140)
-      }
-    ];
-
-    const byName = Object.fromEntries(clients.map((client) => [client.name, client]));
-    const invoice = (clientName, amount, dueDays, createdDays, notes, status = "active") => ({
-      id: uuid(),
-      business_id: business.id,
-      client_id: byName[clientName].id,
-      amount,
-      due_date: at(dueDays, 18, 0),
-      created_at: at(createdDays, 9, 30),
-      notes,
-      status
-    });
-
-    const invoices = [
-      invoice("Sharma General Store", 60000, 3, -5, "Weekly kirana stock refill", "partial"),
-      invoice("Kiran Textiles", 68000, -14, -44, "Grey fabric roll supply", "overdue"),
-      invoice("Patel Merchants", 115000, 5, -10, "Oil cartons and FMCG consignment", "active"),
-      invoice("National Electricals", 87000, 15, -8, "Cable, switch and panel stock", "paid"),
-      invoice("Ravi Bros Hardware", 47000, -21, -48, "Hardware and fastener bundle", "overdue"),
-      invoice("Patel Merchants", 25000, -24, -45, "Previous order closure", "paid"),
-      invoice("Kiran Textiles", 18000, -50, -80, "Old balance settlement", "paid"),
-      invoice("Ravi Bros Hardware", 15000, -42, -62, "Advance settlement", "paid"),
-      invoice("Sharma General Store", 22000, -34, -52, "Old weekly supply", "paid")
-    ];
-
-    const invoiceFor = (clientName, amount) => invoices.find((item) => item.client_id === byName[clientName].id && item.amount === amount);
-    const payment = (clientName, invoiceAmount, amount, days, mode, source, raw_input, confidence, status, number, utr = null, notes = "") => ({
-      id: uuid(),
-      business_id: business.id,
-      client_id: byName[clientName]?.id || null,
-      invoice_id: status === "confirmed" && invoiceAmount ? invoiceFor(clientName, invoiceAmount)?.id || null : null,
-      amount,
-      mode,
-      recorded_at: at(days, 11 + Math.floor(Math.random() * 6), Math.floor(Math.random() * 50)),
-      source,
-      source_number: number,
-      raw_input,
-      confidence,
-      status,
-      utr_number: utr,
-      notes
-    });
-
-    const payments = [
-      payment("Sharma General Store", 60000, 10000, -4, "upi", "whatsapp_voice", "Sharma ne das hazaar UPI bheja RAM ke liye", 0.94, "confirmed", "+919876500001", "UPI632118"),
-      payment("Sharma General Store", 60000, 7500, -1, "cash", "whatsapp_text", "Received cash 7500 from Sharma General", 0.91, "confirmed", "+919876500002"),
-      payment("National Electricals", 87000, 50000, -6, "upi", "whatsapp_image", "UPI screenshot National Electricals 50000 credited", 0.96, "confirmed", "+919876500001", "UTR887650"),
-      payment("National Electricals", 87000, 37000, -2, "neft", "manual", "Manual entry after bank reconciliation", 1, "confirmed", "+919876500001", null, "Marked by accountant"),
-      payment("Patel Merchants", 25000, 25000, -12, "rtgs", "whatsapp_text", "Patel Merchants cleared previous bill by RTGS 25000", 0.93, "confirmed", "+919876500002", "RTGS2011"),
-      payment("Kiran Textiles", 18000, 18000, -28, "cheque", "manual", "Cheque collected against old Kiran balance", 1, "confirmed", "+919876500001"),
-      payment("Ravi Bros Hardware", 15000, 15000, -31, "cash", "whatsapp_voice", "Ravi Bros se purana pandrah hazaar cash mila", 0.9, "confirmed", "+919876500002"),
-      payment("Sharma General Store", 22000, 22000, -25, "upi", "whatsapp_image", "Screenshot Sharma old invoice paid 22000", 0.95, "confirmed", "+919876500001", "UPI771020"),
-      payment("Kiran Textiles", null, 12000, -1, "upi", "whatsapp_text", "Kiran wale bol rahe barah hazaar bheja hai, invoice unsure", 0.73, "pending_review", "+919876500002", "UPI992081"),
-      payment("Patel Merchants", null, 8000, 0, "unknown", "whatsapp_voice", "Patel ka kuch eight thousand received maybe cash", 0.68, "pending_review", "+919876500001")
-    ];
 
     const settings = {
       id: "global",
@@ -343,15 +225,12 @@
       theme: "dark",
       currency_symbol: "₹",
       connection_log: [
-        { at: now, type: "info", message: "Development SSE simulator ready" }
+        { at: now, type: "info", message: "Development SSE connection ready" }
       ]
     };
 
     const tx = db.transaction(STORES, "readwrite");
     tx.objectStore("businesses").put(business);
-    clients.forEach((client) => tx.objectStore("clients").put(client));
-    invoices.forEach((item) => tx.objectStore("invoices").put(item));
-    payments.forEach((item) => tx.objectStore("payments").put(item));
     tx.objectStore("settings").put(settings);
     await tx.done;
   }
@@ -362,7 +241,9 @@
   }
 
   async function getSettings() {
-    const db = await init();
+    if (!seedPromise) seedPromise = seedIfNeeded();
+    await seedPromise;
+    const db = await openDatabase();
     const settings = await db.get("settings", "global");
     const resolvedDefaultEndpoint = isLocalHost
       ? "http://127.0.0.1:3000/sse"
