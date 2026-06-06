@@ -144,6 +144,44 @@
       window.dispatchEvent(new CustomEvent("wl:whatsapp-status", { detail: data }));
     } else if (type === "snapshot") {
       window.dispatchEvent(new CustomEvent("wl:snapshot", { detail: data }));
+    } else if (type === "payment_deleted") {
+      safelyHandleDeletePayment(data);
+    } else if (type === "transaction_deleted") {
+      safelyHandleDeleteTransaction(data);
+    }
+  }
+
+  function safelyHandleDeletePayment(data) {
+    const paymentId = data.payment_id || data.id;
+    if (!paymentId) return;
+    window.WLDB.deletePaymentLocally(paymentId)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent("wl:payment", {
+          detail: { paymentId, deleted: true }
+        }));
+      })
+      .catch(console.error);
+  }
+
+  function safelyHandleDeleteTransaction(data) {
+    const transactionId = data.transaction_id || data.id;
+    if (!transactionId) return;
+    if (data.type === "payment") {
+      window.WLDB.deletePaymentLocally(transactionId)
+        .then(() => {
+          window.dispatchEvent(new CustomEvent("wl:payment", {
+            detail: { paymentId: transactionId, deleted: true }
+          }));
+        })
+        .catch(console.error);
+    } else {
+      window.WLDB.deleteInvoiceLocally(transactionId)
+        .then(() => {
+          window.dispatchEvent(new CustomEvent("wl:ledger-entry", {
+            detail: { transactionId, deleted: true }
+          }));
+        })
+        .catch(console.error);
     }
   }
 

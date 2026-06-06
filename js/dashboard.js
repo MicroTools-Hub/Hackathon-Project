@@ -363,8 +363,13 @@
     const modal = ensureReviewModal();
     const clients = await window.WLDB.getClients();
     const clientSelect = modal.querySelector("[name='client_id']");
-    clientSelect.innerHTML = clients.map((client) => `<option value="${client.id}">${escape(client.name)}</option>`).join("");
-    clientSelect.value = payment.client_id || clients[0]?.id || "";
+    if (clients.length) {
+      clientSelect.innerHTML = clients.map((client) => `<option value="${client.id}">${escape(client.name)}</option>`).join("");
+      clientSelect.value = payment.client_id || clients[0]?.id || "";
+    } else {
+      clientSelect.innerHTML = `<option value="">No clients found. Add a client first.</option>`;
+      clientSelect.value = "";
+    }
     modal.querySelector("[name='amount']").value = payment.amount;
     modal.querySelector("[name='mode']").value = payment.mode;
     modal.querySelector("[name='date']").value = new Date(payment.recorded_at || Date.now()).toISOString().slice(0, 10);

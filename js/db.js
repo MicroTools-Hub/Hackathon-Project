@@ -318,6 +318,7 @@
   }
 
   async function getClient(id) {
+    if (!id || (typeof id !== "string" && typeof id !== "number")) return null;
     const db = await init();
     return db.get("clients", id);
   }
@@ -469,6 +470,9 @@
   }
 
   async function getClientLedger(clientId) {
+    if (!clientId) {
+      return { client: null, summary: null, invoices: [], payments: [] };
+    }
     const [client, summaries, payments] = await Promise.all([
       getClient(clientId),
       computeClientSummaries(),
@@ -479,6 +483,7 @@
   }
 
   async function getOpenInvoicesForClient(clientId) {
+    if (!clientId) return [];
     const ledger = await getClientLedger(clientId);
     return ledger.invoices.filter((invoice) => invoice.balance > 0).sort((a, b) => Number(a.due_date) - Number(b.due_date));
   }
@@ -627,6 +632,26 @@
       } else {
         await queueSyncAction("payment_discarded", { payment_id: id });
       }
+    }
+  }
+
+  async function deletePaymentLocally(id) {
+    if (!id) return;
+    const db = await init();
+    const current = await db.get("payments", id);
+    await db.delete("payments", id);
+    if (current) {
+      await refreshInvoiceStatuses(current.business_id);
+    }
+  }
+
+  async function deleteInvoiceLocally(id) {
+    if (!id) return;
+    const db = await init();
+    const current = await db.get("invoices", id);
+    await db.delete("invoices", id);
+    if (current) {
+      await refreshInvoiceStatuses(current.business_id);
     }
   }
 
@@ -986,6 +1011,8 @@
     updatePayment,
     confirmPayment,
     discardPayment,
+    deletePaymentLocally,
+    deleteInvoiceLocally,
     saveBusinessSetup,
     addTrustedNumber,
     removeTrustedNumber,

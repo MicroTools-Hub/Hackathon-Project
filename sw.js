@@ -1,4 +1,4 @@
-const CACHE_NAME = "wholesaleledger-static-v4";
+const CACHE_NAME = "wholesaleledger-static-v5";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -31,25 +31,33 @@ const APP_SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(APP_SHELL);
+    })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim())
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
 
-  if (request.headers.get("accept")?.includes("text/event-stream") || request.url.includes("/events")) {
+  if (request.url.includes("/api/") || request.headers.get("accept")?.includes("text/event-stream") || request.url.includes("/events")) {
     event.respondWith(fetch(request));
     return;
   }
