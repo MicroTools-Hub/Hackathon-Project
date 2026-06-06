@@ -1,0 +1,30 @@
+{
+  "name": "wholesaleledger-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend for WholesaleLedger WhatsApp AI payment tracking.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "check": "node --check index.js && node scripts/check-modules.js",
+    "tunnel": "..\\tools\\cloudflared.exe tunnel --url http://127.0.0.1:3000"
+  },
+  "dependencies": {
+    "@google/generative-ai": "latest",
+    "@whiskeysockets/baileys": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "groq-sdk": "latest",
+    "multer": "latest",
+    "node-cron": "latest",
+    "p-queue": "latest",
+    "pino": "latest",
+    "qrcode": "latest",
+    "qrcode-terminal": "latest",
+    "sharp": "latest",
+    "uuid": "latest"
+  },
+  "devDependencies": {}
+}

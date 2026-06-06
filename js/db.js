@@ -714,7 +714,7 @@
       try {
         await apiFetch("/api/trusted-numbers", {
           method: "POST",
-          body: JSON.stringify({ phone: cleanPhone })
+          body: JSON.stringify({ phone: cleanPhone, label: label || "Staff" })
         });
       } catch (error) {
         console.warn("Failed to push trusted number to server:", error);
@@ -752,6 +752,16 @@
       trusted_number_meta: (business.trusted_number_meta || []).map((item) => item.phone === phone ? { ...item, active } : item)
     };
     await db.put("businesses", next);
+    if (navigator.onLine) {
+      try {
+        await apiFetch(`/api/trusted-numbers/${encodeURIComponent(phone)}/toggle`, {
+          method: "PUT",
+          body: JSON.stringify({ active })
+        });
+      } catch (error) {
+        console.warn("Failed to toggle trusted number on server:", error);
+      }
+    }
     return next;
   }
 
