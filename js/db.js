@@ -43,7 +43,8 @@
     }
     const url = `${baseUrl}${path}`;
     const defaultHeaders = {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "69420"
     };
     try {
       const response = await fetch(url, {

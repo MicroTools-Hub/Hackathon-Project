@@ -127,7 +127,9 @@
     }
 
     try {
-      const response = await fetch(`${apiBase}/api/qr`).catch(() => null);
+      const response = await fetch(`${apiBase}/api/qr`, {
+        headers: { "ngrok-skip-browser-warning": "69420" }
+      }).catch(() => null);
       if (!response) {
         statusNode.textContent = "Disconnected";
         statusNode.className = "status-badge status-overdue";

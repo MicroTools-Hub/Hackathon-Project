@@ -1,4 +1,4 @@
-const CACHE_NAME = "wholesaleledger-static-v16";
+const CACHE_NAME = "wholesaleledger-static-v17";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -146,9 +146,12 @@ async function markQueuedActionsSynced() {
     if (item.status !== "queued") continue;
     try {
       let url = "";
-      let options = {
+      const options = {
         method: "GET",
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "69420"
+        }
       };
       const actionType = item.type || item.action;
       const actionData = item.payload || item.data;

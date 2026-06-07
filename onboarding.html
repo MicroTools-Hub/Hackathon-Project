@@ -632,7 +632,10 @@
 
       const apiBase = urlInput.replace(/\/sse\/?$/, "");
       try {
-        const response = await fetch(`${apiBase}/api/health`, { mode: "cors" }).catch(() => null);
+        const response = await fetch(`${apiBase}/api/health`, { 
+          mode: "cors",
+          headers: { "ngrok-skip-browser-warning": "69420" }
+        }).catch(() => null);
         if (!response) {
           throw new Error("Unable to contact backend server. Verify the tunnel or localhost status.");
         }
@@ -681,7 +684,9 @@
       const activateBtn = document.getElementById("activateBtn");
 
       try {
-        const res = await fetch(`${apiBase}/api/qr`);
+        const res = await fetch(`${apiBase}/api/qr`, {
+          headers: { "ngrok-skip-browser-warning": "69420" }
+        });
         if (!res.ok) throw new Error("QR endpoint returned error status");
         
         const data = await res.json();
@@ -783,7 +788,10 @@
           const apiBase = sseEndpoint.replace(/\/sse\/?$/, "");
           await fetch(`${apiBase}/api/business`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              "ngrok-skip-browser-warning": "69420"
+            },
             body: JSON.stringify(business)
           }).catch(console.warn);
         }
