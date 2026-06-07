@@ -9,7 +9,8 @@
     "dev": "node --watch index.js",
     "check": "node --check index.js && node scripts/check-modules.js",
     "tunnel": "..\\tools\\cloudflared.exe tunnel run wholesale-ledger-tunnel",
-    "tunnel:temp": "..\\tools\\cloudflared.exe tunnel --url http://127.0.0.1:3000"
+    "tunnel:temp": "..\\tools\\cloudflared.exe tunnel --url http://127.0.0.1:3000",
+    "tunnel:ngrok": "..\\tools\\ngrok.exe http 3000 --url smirk-blighted-marvelous.ngrok-free.dev"
   },
   "dependencies": {
     "@google/generative-ai": "latest",
