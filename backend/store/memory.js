@@ -201,7 +201,8 @@ function createTransaction(data) {
     business_prefix: data.business_prefix || business.prefix,
     match_score: Number(data.match_score || 0),
     applied_to_balance: false,
-    created_at: data.created_at || Date.now()
+    created_at: data.created_at || Date.now(),
+    credit_days: data.credit_days !== undefined ? data.credit_days : null
   };
 }
 
@@ -250,7 +251,8 @@ function applyConfirmedTransaction(client, transaction) {
     );
     client.running_balance += transaction.amount;
     client.last_goods_date = transaction.recorded_at;
-    client.due_date = transaction.recorded_at + Number(client.payment_cycle_days || 30) * DAY;
+    const creditDays = Number(transaction.credit_days || client.payment_cycle_days || 30);
+    client.due_date = transaction.recorded_at + creditDays * DAY;
     transaction.balance_after = client.running_balance;
     transaction.due_date_at_transaction = client.due_date;
     transaction.applied_to_balance = true;

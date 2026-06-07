@@ -57,6 +57,7 @@ Extract this WhatsApp message into exactly this JSON shape:
   "recorded_at": number | null,
   "utr_number": string | null,
   "business_prefix": string | null,
+  "credit_days": number | null,
   "notes": string,
   "confidence": number,
   "reason": string
@@ -67,6 +68,7 @@ Rules:
 - Goods signals: "maal diya", "saman diya", "goods", "stock", "bags", "cartons", "udhar", "bill", "invoice", "supply".
 - Convert Indian amounts written in words or shorthand. "15k" means 15000, "1.15 lakh" means 115000.
 - For goods, amount is the value of goods supplied, not quantity.
+- For goods transactions, if a specific credit period or number of days is mentioned (e.g., "for 40 days", "40 days credit", "40 din"), extract it into credit_days as a number. Otherwise, null.
 - Use Unix epoch milliseconds for recorded_at only if the message explicitly gives a date/time; otherwise null.
 - If no client can be inferred, client_name must be null and confidence must be below 0.85.
 - confidence must be 0 to 1.
@@ -103,10 +105,17 @@ export function sanitizeExtraction(raw = {}, originalText = "") {
     recorded_at: Number(raw.recorded_at || 0) || null,
     utr_number: raw.utr_number || findUtr(originalText),
     business_prefix: raw.business_prefix ? String(raw.business_prefix).toUpperCase() : extractPrefix(originalText),
+    credit_days: raw.credit_days != null ? Number(raw.credit_days) : null,
     notes: raw.notes || "",
     confidence,
     reason: raw.reason || ""
   };
+}
+
+function extractCreditDays(text) {
+  const value = String(text || "").toLowerCase();
+  const match = value.match(/\b(\d+)\s*(?:days?|day|din|days\s+credit)\b/i);
+  return match ? Number(match[1]) : null;
 }
 
 export function heuristicExtract(text, context = {}, reason = "heuristic") {
@@ -126,6 +135,7 @@ export function heuristicExtract(text, context = {}, reason = "heuristic") {
     recorded_at: null,
     utr_number: findUtr(text),
     business_prefix: extractPrefix(text),
+    credit_days: transactionType === "goods" ? extractCreditDays(text) : null,
     notes: reason,
     confidence: isEntry ? (client ? 0.72 : 0.58) : 0.2,
     reason

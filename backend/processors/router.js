@@ -69,7 +69,8 @@ export async function processTextMessage(text, context = {}) {
   if (extraction.transaction_type === "goods") {
     const result = store.addGoods({
       ...base,
-      description: extraction.description || text
+      description: extraction.description || text,
+      credit_days: extraction.credit_days
     });
     if (result.blocked) {
       return { blocked: true, reason: "credit_limit_exceeded", credit_limit_alert: result.alert, extraction, match };
