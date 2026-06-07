@@ -13,40 +13,297 @@
       display: grid;
       place-items: center;
       padding: 1.5rem;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(212, 144, 10, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(74, 127, 165, 0.06) 0%, transparent 40%),
+        var(--bg);
     }
     .onboard-card {
-      width: min(100%, 540px);
-      padding: clamp(2rem, 4vw, 3rem);
+      width: min(100%, 580px);
+      padding: clamp(2rem, 5vw, 3rem);
       border: 1px solid var(--line-strong);
       border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent), var(--surface);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), var(--surface);
       box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
     }
     .onboard-head {
-      margin-bottom: 2rem;
       text-align: center;
+      margin-bottom: 0.5rem;
     }
     .onboard-title {
       font-family: var(--heading);
-      font-size: 1.8rem;
+      font-size: 1.75rem;
       font-weight: 800;
       color: var(--ink-strong);
       margin: 0;
     }
     .onboard-desc {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--muted);
-      margin-top: 0.4rem;
+      margin-top: 0.35rem;
     }
-    .submit-btn {
+    .user-greeting {
+      font-size: 0.82rem;
+      color: var(--amber);
+      font-family: var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+    
+    /* Wizard Steps Indicator */
+    .wizard-steps {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      margin: 0 auto 1.5rem;
       width: 100%;
-      min-height: 46px;
+      max-width: 440px;
+    }
+    .wizard-steps::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: var(--line);
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+    .wizard-progress {
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      width: 0%;
+      height: 2px;
+      background: var(--amber);
+      z-index: 2;
+      transform: translateY(-50%);
+      transition: width 240ms ease;
+    }
+    .wizard-step {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: var(--surface-3);
+      border: 2px solid var(--line-strong);
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.88rem;
+      position: relative;
+      z-index: 3;
+      transition: all 240ms ease;
+    }
+    .wizard-step.active {
+      background: var(--bg);
+      border-color: var(--amber);
+      color: var(--ink-strong);
+      box-shadow: 0 0 12px rgba(212, 144, 10, 0.25);
+    }
+    .wizard-step.completed {
+      background: var(--amber);
+      border-color: var(--amber);
+      color: var(--bg);
+    }
+    .wizard-step-label {
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.72rem;
+      white-space: nowrap;
+      font-weight: 500;
+      color: var(--muted-2);
+      transition: color 240ms ease;
+    }
+    .wizard-step.active .wizard-step-label {
+      color: var(--ink-strong);
+      font-weight: 700;
+    }
+    .wizard-step.completed .wizard-step-label {
+      color: var(--muted);
+    }
+
+    /* Panel layout */
+    .step-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .step-panel.active {
+      display: flex;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
       margin-top: 1rem;
     }
-    .hint-text {
+    .form-actions button {
+      flex: 1;
+      min-height: 44px;
+    }
+
+    /* Step 2 List Styling */
+    .trusted-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--bg-ink);
+      padding: 0.5rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .trusted-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .trusted-item:last-child {
+      border-bottom: 0;
+    }
+    .trusted-item-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .trusted-item-phone {
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--ink-strong);
+    }
+    .trusted-item-label {
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .trusted-item-role-badge {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-weight: 700;
+    }
+    .role-owner {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+    .role-staff {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+    .add-number-row {
+      display: grid;
+      grid-template-columns: 1fr 100px auto;
+      gap: 0.5rem;
+      align-items: end;
+    }
+
+    /* Step 3 WhatsApp QR styling */
+    .backend-verify-box {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      align-items: end;
+    }
+    .qr-pairing-card {
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--bg-ink);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 240px;
+      position: relative;
+    }
+    .qr-image-frame {
+      width: 180px;
+      height: 180px;
+      background: white;
+      border: 8px solid white;
+      border-radius: 4px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-image-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .qr-placeholder-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(212, 144, 10, 0.15);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      animation: spin 800ms linear infinite;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
       font-size: 0.78rem;
-      color: var(--muted-2);
-      margin-top: 0.2rem;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+    .status-badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-online {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+    .status-offline {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+    .status-pending {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+    .connection-status-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 0.75rem;
+    }
+    .qr-info-text {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+      line-height: 1.4;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (max-width: 480px) {
+      .add-number-row {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+      .backend-verify-box {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -54,43 +311,146 @@
   <div class="onboard-container">
     <article class="onboard-card">
       <div class="onboard-head">
-        <h1 class="onboard-title">Create New Ledger</h1>
-        <p class="onboard-desc">Configure your business profile to activate your AI ledger.</p>
+        <div class="user-greeting" id="userGreeting">Welcome!</div>
+        <h1 class="onboard-title">Setup New Ledger</h1>
+        <p class="onboard-desc">Configure your business to launch your AI ledger.</p>
       </div>
 
-      <form class="form-grid" id="onboardForm">
-        <div class="field">
-          <label for="businessName">Business Name</label>
-          <input class="field-control" id="businessName" name="name" type="text" placeholder="e.g. Ramesh Traders" required>
-          <p class="hint-text">The official name of your business or shop.</p>
+      <!-- Steps Indicator -->
+      <div class="wizard-steps">
+        <div class="wizard-progress" id="wizardProgress"></div>
+        <div class="wizard-step active" data-step-indicator="1">
+          1
+          <span class="wizard-step-label">Profile</span>
+        </div>
+        <div class="wizard-step" data-step-indicator="2">
+          2
+          <span class="wizard-step-label">Trusted Numbers</span>
+        </div>
+        <div class="wizard-step" data-step-indicator="3">
+          3
+          <span class="wizard-step-label">WhatsApp</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Ledger Details -->
+      <section class="step-panel active" data-step-panel="1">
+        <form class="form-grid" id="step1Form" onsubmit="goToStep(2, event)">
+          <div class="field">
+            <label for="businessName">Business Name</label>
+            <input class="field-control" id="businessName" name="name" type="text" placeholder="e.g. Ramesh Traders" required>
+            <p class="hint-text">The official name of your business or shop.</p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="businessPrefix">Business Prefix</label>
+              <input class="field-control" id="businessPrefix" name="prefix" type="text" placeholder="e.g. RAM" maxlength="6" required style="text-transform: uppercase;">
+              <p class="hint-text">A 3-5 letter prefix used to identify your WhatsApp messages.</p>
+            </div>
+            <div class="field">
+              <label for="currencySymbol">Currency Symbol</label>
+              <select class="field-control" id="currencySymbol" name="currency_symbol">
+                <option value="₹">Rupee (₹)</option>
+                <option value="$">Dollar ($)</option>
+                <option value="€">Euro (€)</option>
+                <option value="£">Pound (£)</option>
+              </select>
+              <p class="hint-text">The default currency for calculations.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="ownerPhone">Owner WhatsApp Number</label>
+            <input class="field-control" id="ownerPhone" name="owner_phone" type="tel" placeholder="e.g. +919876500001" required>
+            <p class="hint-text">Include your country code. This number is the primary owner and will manage the ledger.</p>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit" style="margin-left: auto; max-width: 200px;">Continue</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Step 2: Trusted Numbers configuration -->
+      <section class="step-panel" data-step-panel="2">
+        <div>
+          <h2 style="font-size: 1.1rem; margin: 0 0 0.5rem; color: var(--ink-strong);">Authorized WhatsApp Contacts</h2>
+          <p style="font-size: 0.84rem; color: var(--muted); margin: 0 0 1.25rem;">
+            Only messages from these numbers will trigger updates to your ledger. You can add managers or staff.
+          </p>
         </div>
 
-        <div class="field-row">
-          <div class="field">
-            <label for="businessPrefix">Business Prefix</label>
-            <input class="field-control" id="businessPrefix" name="prefix" type="text" placeholder="e.g. RAM" maxlength="6" required>
-            <p class="hint-text">A 3-5 letter prefix used to identify your WhatsApp messages.</p>
+        <div class="trusted-box" id="trustedNumbersList">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="add-number-row">
+          <div class="field" style="margin-bottom:0;">
+            <label for="newPhone">Staff Phone Number</label>
+            <input class="field-control" id="newPhone" type="tel" placeholder="e.g. +919876500002">
           </div>
-          <div class="field">
-            <label for="currencySymbol">Currency Symbol</label>
-            <select class="field-control" id="currencySymbol" name="currency_symbol">
-              <option value="₹">Rupee (₹)</option>
-              <option value="$">Dollar ($)</option>
-              <option value="€">Euro (€)</option>
-              <option value="£">Pound (£)</option>
+          <div class="field" style="margin-bottom:0;">
+            <label for="newLabel">Role/Name</label>
+            <select class="field-control" id="newLabel">
+              <option value="Staff">Staff</option>
+              <option value="Manager">Manager</option>
+              <option value="Accountant">Accountant</option>
             </select>
-            <p class="hint-text">The default currency for calculations.</p>
+          </div>
+          <button class="btn" type="button" onclick="handleAddTrustedNumber()" style="min-height:40px; padding: 0 1rem;">Add</button>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" type="button" onclick="goToStep(1)">Back</button>
+          <button class="btn btn-primary" type="button" onclick="goToStep(3)">Continue</button>
+        </div>
+      </section>
+
+      <!-- Step 3: WhatsApp pairing and QR code scan -->
+      <section class="step-panel" data-step-panel="3">
+        <div>
+          <h2 style="font-size: 1.1rem; margin: 0 0 0.5rem; color: var(--ink-strong);">Connect WhatsApp Device</h2>
+          <p style="font-size: 0.84rem; color: var(--muted); margin: 0 0 1.25rem;">
+            Scan the QR code below to connect WhatsApp sync. This enables real-time message recording.
+          </p>
+        </div>
+
+        <div class="backend-verify-box">
+          <div class="field" style="margin-bottom:0;">
+            <label for="backendUrl">Backend Server Connection URL</label>
+            <input class="field-control" id="backendUrl" type="url" placeholder="http://127.0.0.1:3000">
+          </div>
+          <button class="btn" type="button" onclick="verifyAndConnectBackend()">Verify Connection</button>
+        </div>
+        <p class="hint-text" id="connectionFeedback" style="margin: -0.5rem 0 0.5rem; color: var(--muted);"></p>
+
+        <div class="qr-pairing-card">
+          <div class="connection-status-container">
+            <span style="font-size: 0.85rem; font-weight:700; color:var(--ink-strong);">WhatsApp Status</span>
+            <span class="status-badge status-offline" id="whatsappStatusBadge">Checking...</span>
+          </div>
+
+          <div id="whatsappQrBox" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+            <div class="qr-image-frame" id="qrFrame">
+              <div class="qr-placeholder-spinner"></div>
+            </div>
+            <p class="qr-info-text" id="qrInfo">
+              Open WhatsApp > Linked Devices > Link a Device, and scan this QR code.
+            </p>
           </div>
         </div>
 
-        <div class="field">
-          <label for="ownerPhone">Owner WhatsApp Number</label>
-          <input class="field-control" id="ownerPhone" name="owner_phone" type="tel" placeholder="e.g. +919876500001" required>
-          <p class="hint-text">Include your country code. This number will be authorized to manage and update the ledger.</p>
+        <div class="form-actions">
+          <button class="btn btn-secondary" type="button" onclick="goToStep(2)">Back</button>
+          <button class="btn btn-primary" type="button" onclick="activateLedger()" id="activateBtn">Activate Ledger</button>
         </div>
+        
+        <div style="text-align: center; margin-top: -0.5rem;">
+          <a href="#" onclick="skipWhatsAppAndActivate(event)" style="font-size: 0.82rem; color: var(--muted); text-decoration: underline;">Skip WhatsApp link for now & activate</a>
+        </div>
+      </section>
 
-        <button class="btn btn-primary submit-btn" type="submit">Activate Ledger</button>
-      </form>
     </article>
   </div>
 
@@ -98,56 +458,361 @@
   <script src="js/db.js"></script>
   <script src="js/notify.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Direct redirect if not logged in
-      const user = localStorage.getItem("wl_user");
-      if (!user) {
+    let currentStep = 1;
+    let localTrustedNumbers = []; // Array of { phone, label }
+    let qrPollInterval = null;
+    let sseEndpoint = "";
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1. Verify SSO user state
+      const userString = localStorage.getItem("wl_user");
+      if (!userString) {
         window.location.href = "login.html";
         return;
       }
+      
+      const user = JSON.parse(userString);
+      const greeting = document.getElementById("userGreeting");
+      if (greeting && user.name) {
+        greeting.textContent = `Welcome, ${user.name.split(" ")[0]}!`;
+      }
 
-      const form = document.getElementById("onboardForm");
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const data = new FormData(form);
-        const name = data.get("name");
-        const prefix = data.get("prefix");
-        const currency_symbol = data.get("currency_symbol");
-        const owner_phone = data.get("owner_phone");
+      // 2. Initialize default endpoint in URL input
+      await window.WLDB.init();
+      const settings = await window.WLDB.getSettings();
+      sseEndpoint = settings.sse_endpoint || "http://127.0.0.1:3000/sse";
+      document.getElementById("backendUrl").value = sseEndpoint;
 
-        try {
-          // 1. Create the business record and reset local data
-          const business = await window.WLDB.createBusiness({
-            name,
-            prefix,
-            currency_symbol
-          });
-
-          // 2. Add owner phone number as a trusted number
-          await window.WLDB.addTrustedNumber(owner_phone, "Owner");
-
-          // 3. Save owner_number back to business structure
-          business.owner_number = owner_phone;
-          const db = await window.WLDB.init();
-          await db.put("businesses", business);
-
-          if (navigator.onLine) {
-            // Push updated business with owner number to server
-            await fetch(window.WLDB.getSettings().then(s => s.sse_endpoint.replace(/\/sse\/?$/, "") + "/api/business"), {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(business)
-            }).catch(console.warn);
-          }
-
-          window.WLNotify.success("Ledger activated!", name);
-          window.location.href = "index.html";
-        } catch (error) {
-          console.error("Failed to setup business:", error);
-          window.WLNotify.error("Activation failed", error.message);
-        }
-      });
+      // 3. Pre-bind form inputs
+      const ownerInput = document.getElementById("ownerPhone");
+      // Add standard input listener to sync owner number into Step 2 array automatically
+      ownerInput.addEventListener("input", syncOwnerToTrusted);
+      
+      renderStep();
     });
+
+    function syncOwnerToTrusted() {
+      const ownerVal = document.getElementById("ownerPhone").value.trim();
+      // Find and update or add
+      const idx = localTrustedNumbers.findIndex(n => n.isOwner);
+      if (ownerVal) {
+        if (idx >= 0) {
+          localTrustedNumbers[idx].phone = ownerVal;
+        } else {
+          localTrustedNumbers.unshift({ phone: ownerVal, label: "Owner", isOwner: true });
+        }
+      } else {
+        if (idx >= 0) {
+          localTrustedNumbers.splice(idx, 1);
+        }
+      }
+      if (currentStep === 2) {
+        renderTrustedNumbersList();
+      }
+    }
+
+    function renderStep() {
+      // Update progress bar
+      const progressMap = { 1: 0, 2: 50, 3: 100 };
+      document.getElementById("wizardProgress").style.width = progressMap[currentStep] + "%";
+
+      // Toggle panels
+      document.querySelectorAll("[data-step-panel]").forEach(panel => {
+        const stepNum = parseInt(panel.dataset.stepPanel, 10);
+        panel.classList.toggle("active", stepNum === currentStep);
+      });
+
+      // Toggle active states on indicators
+      document.querySelectorAll("[data-step-indicator]").forEach(ind => {
+        const stepNum = parseInt(ind.dataset.stepIndicator, 10);
+        ind.classList.toggle("active", stepNum === currentStep);
+        ind.classList.toggle("completed", stepNum < currentStep);
+      });
+
+      // Trigger step-specific behavior
+      if (currentStep === 2) {
+        syncOwnerToTrusted();
+        renderTrustedNumbersList();
+        stopQrPolling();
+      } else if (currentStep === 3) {
+        verifyAndConnectBackend();
+      } else {
+        stopQrPolling();
+      }
+    }
+
+    function goToStep(step, event) {
+      if (event) event.preventDefault();
+
+      if (step === 2 && currentStep === 1) {
+        const form = document.getElementById("step1Form");
+        if (!form.reportValidity()) return;
+      }
+
+      currentStep = step;
+      renderStep();
+    }
+
+    // --- STEP 2 LOGIC ---
+    function renderTrustedNumbersList() {
+      const container = document.getElementById("trustedNumbersList");
+      if (!localTrustedNumbers.length) {
+        container.innerHTML = `<p style="color:var(--muted); font-size:0.85rem; text-align:center; padding:10px; margin:0;">No trusted numbers yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = localTrustedNumbers.map((num, index) => `
+        <div class="trusted-item">
+          <div class="trusted-item-info">
+            <span class="trusted-item-phone">${escapeHtml(num.phone)}</span>
+            <span class="trusted-item-label">${escapeHtml(num.label)}</span>
+          </div>
+          <div>
+            ${num.isOwner 
+              ? `<span class="trusted-item-role-badge role-owner">Owner</span>`
+              : `<button class="btn btn-danger" type="button" onclick="removeTrustedNumberAt(${index})" style="min-height:28px; padding: 2px 8px; font-size:0.75rem;">Delete</button>`
+            }
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function handleAddTrustedNumber() {
+      const phoneInput = document.getElementById("newPhone");
+      const labelInput = document.getElementById("newLabel");
+      const phone = phoneInput.value.trim();
+      const label = labelInput.value;
+
+      if (!phone) {
+        window.WLNotify.error("Validation error", "Please enter a valid phone number");
+        phoneInput.focus();
+        return;
+      }
+
+      if (localTrustedNumbers.some(n => n.phone === phone)) {
+        window.WLNotify.warning("Duplicate number", "This phone number is already added");
+        return;
+      }
+
+      localTrustedNumbers.push({ phone, label, isOwner: false });
+      phoneInput.value = "";
+      renderTrustedNumbersList();
+      window.WLNotify.success("Number added", phone);
+    }
+
+    function removeTrustedNumberAt(index) {
+      const removed = localTrustedNumbers[index];
+      localTrustedNumbers.splice(index, 1);
+      renderTrustedNumbersList();
+      window.WLNotify.info("Number removed", removed.phone);
+    }
+
+    // --- STEP 3 LOGIC (WhatsApp / Backend URL Link) ---
+    async function verifyAndConnectBackend() {
+      const urlInput = document.getElementById("backendUrl").value.trim();
+      const feedback = document.getElementById("connectionFeedback");
+      const statusBadge = document.getElementById("whatsappStatusBadge");
+      const qrFrame = document.getElementById("qrFrame");
+
+      if (!urlInput) {
+        feedback.textContent = "Please enter a backend URL.";
+        feedback.style.color = "var(--red)";
+        return;
+      }
+
+      feedback.textContent = "Verifying backend connection...";
+      feedback.style.color = "var(--muted)";
+      statusBadge.textContent = "Checking...";
+      statusBadge.className = "status-badge status-pending";
+      qrFrame.innerHTML = `<div class="qr-placeholder-spinner"></div>`;
+
+      // Save endpoint temporarily
+      sseEndpoint = urlInput;
+      await window.WLDB.saveSettings({ sse_endpoint: urlInput });
+
+      const apiBase = urlInput.replace(/\/sse\/?$/, "");
+      try {
+        const response = await fetch(`${apiBase}/api/health`, { mode: "cors" }).catch(() => null);
+        if (!response) {
+          throw new Error("Unable to contact backend server. Verify the tunnel or localhost status.");
+        }
+        
+        const data = await response.json();
+        feedback.textContent = "Connected to backend successfully!";
+        feedback.style.color = "var(--green)";
+        
+        // Save connection setting permanently
+        await window.WLDB.saveSettings({ sse_endpoint: urlInput });
+        
+        // Start live WhatsApp status polling
+        startQrPolling();
+      } catch (error) {
+        feedback.textContent = error.message || "Failed to reach server.";
+        feedback.style.color = "var(--red)";
+        statusBadge.textContent = "Backend Offline";
+        statusBadge.className = "status-badge status-offline";
+        qrFrame.innerHTML = `
+          <div style="text-align:center; padding:10px; font-size:0.8rem; color:var(--red);">
+            Offline
+          </div>
+        `;
+        stopQrPolling();
+      }
+    }
+
+    function startQrPolling() {
+      if (qrPollInterval) clearInterval(qrPollInterval);
+      pollWhatsAppStatusAndQr();
+      qrPollInterval = setInterval(pollWhatsAppStatusAndQr, 3000);
+    }
+
+    function stopQrPolling() {
+      if (qrPollInterval) {
+        clearInterval(qrPollInterval);
+        qrPollInterval = null;
+      }
+    }
+
+    async function pollWhatsAppStatusAndQr() {
+      const apiBase = sseEndpoint.replace(/\/sse\/?$/, "");
+      const statusBadge = document.getElementById("whatsappStatusBadge");
+      const qrFrame = document.getElementById("qrFrame");
+      const qrInfo = document.getElementById("qrInfo");
+      const activateBtn = document.getElementById("activateBtn");
+
+      try {
+        const res = await fetch(`${apiBase}/api/qr`);
+        if (!res.ok) throw new Error("QR endpoint returned error status");
+        
+        const data = await res.json();
+        const status = data.status || "disconnected";
+        
+        statusBadge.textContent = status;
+        
+        if (status === "connected") {
+          statusBadge.className = "status-badge status-online";
+          qrFrame.innerHTML = `
+            <div style="text-align:center; color:var(--green);">
+              <svg style="width:54px; height:54px; margin:0 auto 0.5rem; display:block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p style="font-weight:700; font-size:0.85rem; margin:0;">Connected</p>
+            </div>
+          `;
+          qrFrame.style.background = "var(--bg-ink)";
+          qrFrame.style.border = "0";
+          qrInfo.textContent = "WhatsApp linkage completed successfully! Click 'Activate Ledger' to proceed.";
+          qrInfo.style.color = "var(--green)";
+          activateBtn.textContent = "Activate & Go to Dashboard";
+          activateBtn.className = "btn btn-primary";
+        } else {
+          statusBadge.className = status === "connecting" ? "status-badge status-pending" : "status-badge status-offline";
+          activateBtn.textContent = "Activate Ledger";
+          qrInfo.style.color = "var(--muted)";
+          qrInfo.textContent = "Open WhatsApp > Linked Devices > Link a Device, and scan this QR code.";
+          
+          if (data.qr || data.image) {
+            qrFrame.innerHTML = `<img src="${data.qr || data.image}" alt="WhatsApp QR" style="width:100%; height:100%; object-fit:contain;">`;
+            qrFrame.style.background = "white";
+            qrFrame.style.border = "8px solid white";
+          } else {
+            qrFrame.innerHTML = `<div class="qr-placeholder-spinner"></div>`;
+          }
+        }
+      } catch (err) {
+        console.warn("QR polling error:", err);
+      }
+    }
+
+    // --- FINALIZE ONBOARDING ---
+    async function activateLedger() {
+      const form = document.getElementById("step1Form");
+      if (!form.reportValidity()) {
+        currentStep = 1;
+        renderStep();
+        return;
+      }
+
+      const name = document.getElementById("businessName").value.trim();
+      const prefix = document.getElementById("businessPrefix").value.trim().toUpperCase();
+      const currency = document.getElementById("currencySymbol").value;
+      const ownerPhone = document.getElementById("ownerPhone").value.trim();
+
+      const activateBtn = document.getElementById("activateBtn");
+      activateBtn.disabled = true;
+      activateBtn.textContent = "Activating...";
+
+      try {
+        // 1. Create the business record locally and trigger DB reset (local and server via resetDb)
+        const business = await window.WLDB.createBusiness({
+          name,
+          prefix,
+          currency_symbol: currency
+        });
+
+        // 2. Add owner phone number and other trusted numbers configured in Step 2
+        for (const num of localTrustedNumbers) {
+          await window.WLDB.addTrustedNumber(num.phone, num.label);
+        }
+
+        // 3. Update business record structure with owner phone and save to DB
+        business.owner_number = ownerPhone;
+        
+        // Compile the full trusted metadata list
+        business.trusted_numbers = localTrustedNumbers.map(n => n.phone);
+        business.trusted_number_meta = localTrustedNumbers.map(n => ({
+          phone: n.phone,
+          label: n.label,
+          active: true,
+          last_message_at: null,
+          created_at: Date.now()
+        }));
+
+        const db = await window.WLDB.init();
+        await db.put("businesses", business);
+
+        // 4. Update backend SSE endpoint permanently
+        await window.WLDB.saveSettings({ 
+          active_business_id: business.id,
+          currency_symbol: currency,
+          sse_endpoint: sseEndpoint
+        });
+
+        // 5. Send updated business configuration containing ALL numbers to server
+        if (navigator.onLine) {
+          const apiBase = sseEndpoint.replace(/\/sse\/?$/, "");
+          await fetch(`${apiBase}/api/business`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(business)
+          }).catch(console.warn);
+        }
+
+        stopQrPolling();
+        window.WLNotify.success("Ledger activated successfully!", name);
+        
+        // Direct redirection to dashboard
+        window.setTimeout(() => {
+          window.location.href = "index.html";
+        }, 800);
+
+      } catch (err) {
+        console.error("Ledger activation failed:", err);
+        window.WLNotify.error("Activation failed", err.message || err);
+        activateBtn.disabled = false;
+        activateBtn.textContent = "Activate Ledger";
+      }
+    }
+
+    function skipWhatsAppAndActivate(event) {
+      if (event) event.preventDefault();
+      activateLedger();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
   </script>
 </body>
 </html>

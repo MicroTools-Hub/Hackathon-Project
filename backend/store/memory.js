@@ -339,9 +339,26 @@ export const store = {
   },
 
   updateBusiness(patch) {
+    if (!business) {
+      business = {
+        id: patch.id || randomUUID(),
+        name: "",
+        prefix: "",
+        trusted_numbers: [],
+        trusted_number_meta: [],
+        created_at: Date.now()
+      };
+    }
+    if (patch.id) business.id = patch.id;
     if (patch.name) business.name = String(patch.name).trim();
     if (patch.prefix) business.prefix = String(patch.prefix).trim().toUpperCase();
     if (patch.owner_number) business.owner_number = normalizePhone(patch.owner_number);
+    if (patch.trusted_numbers) {
+      business.trusted_numbers = patch.trusted_numbers.map(normalizePhone).filter(Boolean);
+    }
+    if (patch.trusted_number_meta) {
+      business.trusted_number_meta = patch.trusted_number_meta;
+    }
     saveDb();
     return business;
   },
@@ -695,6 +712,14 @@ export const store = {
   },
 
   resetDb() {
+    business = {
+      id: "",
+      name: "",
+      prefix: "",
+      trusted_numbers: [],
+      trusted_number_meta: [],
+      created_at: Date.now()
+    };
     clients = [];
     transactions = [];
     creditLimitAlerts = [];
