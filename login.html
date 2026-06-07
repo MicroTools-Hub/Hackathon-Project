@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login · WholesaleLedger</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    .auth-container {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+    }
+    .auth-card {
+      width: min(100%, 460px);
+      padding: clamp(2rem, 4vw, 3rem);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent), var(--surface);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .auth-logo {
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .logo-icon {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(212, 144, 10, 0.75);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, rgba(212, 144, 10, 0.3), rgba(74, 127, 165, 0.12)), #111412;
+      color: var(--ink-strong);
+      font-family: var(--heading);
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+    .logo-text {
+      font-family: var(--heading);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--ink-strong);
+      margin: 0;
+    }
+    .logo-desc {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .sso-button {
+      width: 100%;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      color: var(--ink-strong);
+      font-weight: 700;
+      transition: background 160ms ease, transform 160ms ease;
+      margin-bottom: 1.5rem;
+    }
+    .sso-button:hover {
+      background: var(--surface-3);
+    }
+    .sso-button:active {
+      transform: translateY(1px);
+    }
+    .google-icon {
+      width: 18px;
+      height: 18px;
+    }
+    .divider {
+      position: relative;
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    .divider::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--line);
+      z-index: 1;
+    }
+    .divider-text {
+      position: relative;
+      z-index: 2;
+      padding: 0 0.75rem;
+      background: var(--surface);
+      color: var(--muted-2);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
+    .auth-submit-btn {
+      width: 100%;
+      min-height: 44px;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <article class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-icon">WL</div>
+        <div>
+          <h1 class="logo-text">WholesaleLedger</h1>
+          <p class="logo-desc">AI-Powered Ledgers & Payment Tracking</p>
+        </div>
+      </div>
+
+      <button class="sso-button" type="button" id="googleSsoBtn">
+        <svg class="google-icon" viewBox="0 0 24 24" width="100%" height="100%">
+          <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.437-2.882-6.437-6.437 0-3.555 2.882-6.437 6.437-6.437 1.488 0 2.858.508 3.947 1.353l3.074-3.074C19.123 2.127 15.9 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.898 0 10.74-4.257 11.24-10.155H12.24z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <div class="divider">
+        <span class="divider-text">or use email</span>
+      </div>
+
+      <form class="form-grid" id="loginForm">
+        <div class="field" style="text-align: left;">
+          <label for="emailInput">Email Address</label>
+          <input class="field-control" id="emailInput" type="email" placeholder="name@business.com" required>
+        </div>
+        <button class="btn btn-primary auth-submit-btn" type="submit">Sign In</button>
+      </form>
+    </article>
+  </div>
+
+  <script src="js/db.js"></script>
+  <script src="js/notify.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Direct redirect if already logged in and has active business
+      checkAlreadyLoggedIn();
+
+      const form = document.getElementById("loginForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("emailInput").value.trim();
+        await handleLogin(email, email.split("@")[0]);
+      });
+
+      const ssoBtn = document.getElementById("googleSsoBtn");
+      ssoBtn.addEventListener("click", () => {
+        // Open mock SSO window
+        const width = 500;
+        const height = 600;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+        const ssoWindow = window.open("sso-mock.html", "GoogleSSO", `width=${width},height=${height},top=${top},left=${left}`);
+      });
+
+      // Listen for SSO messages from popup
+      window.addEventListener("message", async (event) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data && event.data.type === "SSO_SUCCESS") {
+          await handleLogin(event.data.email, event.data.name);
+        }
+      });
+    });
+
+    async function checkAlreadyLoggedIn() {
+      const user = localStorage.getItem("wl_user");
+      if (user) {
+        // Check if there is an active business
+        await window.WLDB.init();
+        const active = await window.WLDB.getActiveBusiness();
+        if (active) {
+          window.location.href = "index.html";
+        } else {
+          window.location.href = "onboarding.html";
+        }
+      }
+    }
+
+    async function handleLogin(email, name) {
+      localStorage.setItem("wl_user", JSON.stringify({
+        email,
+        name: name || email.split("@")[0],
+        logged_at: Date.now()
+      }));
+      window.WLNotify.success("Welcome!", email);
+      
+      // Check for active business
+      await window.WLDB.init();
+      const active = await window.WLDB.getActiveBusiness();
+      if (active) {
+        window.location.href = "index.html";
+      } else {
+        window.location.href = "onboarding.html";
+      }
+    }
+  </script>
+</body>
+</html>

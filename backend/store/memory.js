@@ -692,5 +692,12 @@ export const store = {
 
   listConnectionEvents() {
     return [...connectionEvents];
+  },
+
+  resetDb() {
+    clients = [];
+    transactions = [];
+    creditLimitAlerts = [];
+    saveDb();
   }
 };

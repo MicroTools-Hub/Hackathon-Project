@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setup Ledger · WholesaleLedger</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    .onboard-container {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+    }
+    .onboard-card {
+      width: min(100%, 540px);
+      padding: clamp(2rem, 4vw, 3rem);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent), var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .onboard-head {
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    .onboard-title {
+      font-family: var(--heading);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--ink-strong);
+      margin: 0;
+    }
+    .onboard-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+    .submit-btn {
+      width: 100%;
+      min-height: 46px;
+      margin-top: 1rem;
+    }
+    .hint-text {
+      font-size: 0.78rem;
+      color: var(--muted-2);
+      margin-top: 0.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="onboard-container">
+    <article class="onboard-card">
+      <div class="onboard-head">
+        <h1 class="onboard-title">Create New Ledger</h1>
+        <p class="onboard-desc">Configure your business profile to activate your AI ledger.</p>
+      </div>
+
+      <form class="form-grid" id="onboardForm">
+        <div class="field">
+          <label for="businessName">Business Name</label>
+          <input class="field-control" id="businessName" name="name" type="text" placeholder="e.g. Ramesh Traders" required>
+          <p class="hint-text">The official name of your business or shop.</p>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="businessPrefix">Business Prefix</label>
+            <input class="field-control" id="businessPrefix" name="prefix" type="text" placeholder="e.g. RAM" maxlength="6" required>
+            <p class="hint-text">A 3-5 letter prefix used to identify your WhatsApp messages.</p>
+          </div>
+          <div class="field">
+            <label for="currencySymbol">Currency Symbol</label>
+            <select class="field-control" id="currencySymbol" name="currency_symbol">
+              <option value="₹">Rupee (₹)</option>
+              <option value="$">Dollar ($)</option>
+              <option value="€">Euro (€)</option>
+              <option value="£">Pound (£)</option>
+            </select>
+            <p class="hint-text">The default currency for calculations.</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ownerPhone">Owner WhatsApp Number</label>
+          <input class="field-control" id="ownerPhone" name="owner_phone" type="tel" placeholder="e.g. +919876500001" required>
+          <p class="hint-text">Include your country code. This number will be authorized to manage and update the ledger.</p>
+        </div>
+
+        <button class="btn btn-primary submit-btn" type="submit">Activate Ledger</button>
+      </form>
+    </article>
+  </div>
+
+  <script src="js/vendor-idb.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/notify.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Direct redirect if not logged in
+      const user = localStorage.getItem("wl_user");
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const form = document.getElementById("onboardForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const data = new FormData(form);
+        const name = data.get("name");
+        const prefix = data.get("prefix");
+        const currency_symbol = data.get("currency_symbol");
+        const owner_phone = data.get("owner_phone");
+
+        try {
+          // 1. Create the business record and reset local data
+          const business = await window.WLDB.createBusiness({
+            name,
+            prefix,
+            currency_symbol
+          });
+
+          // 2. Add owner phone number as a trusted number
+          await window.WLDB.addTrustedNumber(owner_phone, "Owner");
+
+          // 3. Save owner_number back to business structure
+          business.owner_number = owner_phone;
+          const db = await window.WLDB.init();
+          await db.put("businesses", business);
+
+          if (navigator.onLine) {
+            // Push updated business with owner number to server
+            await fetch(window.WLDB.getSettings().then(s => s.sse_endpoint.replace(/\/sse\/?$/, "") + "/api/business"), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(business)
+            }).catch(console.warn);
+          }
+
+          window.WLNotify.success("Ledger activated!", name);
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("Failed to setup business:", error);
+          window.WLNotify.error("Activation failed", error.message);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

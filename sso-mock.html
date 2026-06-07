@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in - Google Accounts</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Roboto, Arial, sans-serif;
+      background: #ffffff;
+      color: #202124;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+    .sso-card {
+      width: min(100vw, 450px);
+      padding: 2.5rem 2rem;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      text-align: center;
+    }
+    @media (max-width: 450px) {
+      .sso-card {
+        border: 0;
+        padding: 1.5rem;
+      }
+    }
+    .google-logo {
+      height: 24px;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 400;
+      margin: 0 0 0.5rem;
+      color: #202124;
+    }
+    .subtitle {
+      font-size: 0.94rem;
+      color: #5f6368;
+      margin-bottom: 2rem;
+    }
+    .account-list {
+      display: grid;
+      gap: 0.5rem;
+      text-align: left;
+      margin-bottom: 2rem;
+    }
+    .account-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #dadce0;
+      cursor: pointer;
+      transition: background 160ms ease;
+    }
+    .account-item:hover {
+      background: #f8f9fa;
+    }
+    .account-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: #4285f4;
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+    }
+    .account-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .account-name {
+      font-weight: 500;
+      font-size: 0.88rem;
+      color: #3c4043;
+    }
+    .account-email {
+      font-size: 0.78rem;
+      color: #5f6368;
+    }
+    .custom-email-form {
+      display: none;
+      text-align: left;
+    }
+    .field {
+      display: grid;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+    .field label {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #5f6368;
+    }
+    .field-control {
+      padding: 0.7rem 0.8rem;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 160ms ease;
+    }
+    .field-control:focus {
+      border-color: #1a73e8;
+    }
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.5rem;
+    }
+    .btn {
+      padding: 0.5rem 1rem;
+      border: 0;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+    .btn-link {
+      background: transparent;
+      color: #1a73e8;
+    }
+    .btn-primary {
+      background: #1a73e8;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #1557b0;
+    }
+  </style>
+</head>
+<body>
+  <div class="sso-card">
+    <svg class="google-logo" viewBox="0 0 74 24" fill="none">
+      <path d="M9.2 18.5c-4.4 0-8-3.5-8-8s3.6-8 8-8c2.4 0 4.1.9 5.5 2.2L13 6.4c-1-1-2.3-1.6-3.8-1.6-3 0-5.5 2.5-5.5 5.7s2.5 5.7 5.5 5.7c2 0 3-.8 3.8-1.6.6-.6 1-1.5 1.1-2.7H9.2v-3.4h11.2c.1.6.1 1.2.1 1.9 0 2.2-.6 4.9-2.5 6.8-1.9 2-4.3 3.2-8.8 3.2z" fill="#4285F4"/>
+      <path d="M28.3 18.5c-2.4 0-4.3-1.8-4.3-4.5s1.9-4.5 4.3-4.5S32.6 11.3 32.6 14s-1.9 4.5-4.3 4.5zm0-2.8c1.3 0 2.3-1.1 2.3-2.6s-1-2.6-2.3-2.6-2.3 1.1-2.3 2.6 1 2.6 2.3 2.6z" fill="#EA4335"/>
+      <path d="M38.2 18.5c-2.4 0-4.3-1.8-4.3-4.5s1.9-4.5 4.3-4.5 4.3 1.8 4.3 4.5-1.9 4.5-4.3 4.5zm0-2.8c1.3 0 2.3-1.1 2.3-2.6s-1-2.6-2.3-2.6-2.3 1.1-2.3 2.6 1 2.6 2.3 2.6z" fill="#FBBC05"/>
+      <path d="M48 18.5c-2.4 0-4.3-1.8-4.3-4.5s1.9-4.5 4.3-4.5c2.2 0 4 1.7 4 4.3v.6H46.1c.1 1 1 1.8 2.1 1.8.9 0 1.5-.4 1.9-1l3 1.5c-.7 1.2-2.2 2.8-5.1 2.8zm-.1-6.4c-1 0-1.7.7-1.9 1.5H50c-.1-.8-.8-1.5-1.7-1.5z" fill="#4285F4"/>
+      <path d="M55.7 2.2h3.4v15.9h-3.4z" fill="#34A853"/>
+      <path d="M66.4 18.5c-2.4 0-4.3-1.8-4.3-4.5s1.9-4.5 4.3-4.5 3.9 1.8 3.9 4.3v.6H64.6c.1 1 1 1.8 2.1 1.8.9 0 1.5-.4 1.9-1l3 1.5c-.8 1.2-2.3 2.8-5.2 2.8zm-.2-6.4c-1 0-1.7.7-1.9 1.5h3.9c-.1-.8-.8-1.5-1.8-1.5z" fill="#EA4335"/>
+    </svg>
+
+    <div id="accountSelection">
+      <h1>Choose an account</h1>
+      <p class="subtitle">to continue to WholesaleLedger</p>
+      
+      <div class="account-list">
+        <div class="account-item" onclick="selectAccount('huzeifa@gmail.com', 'Huzeifa Malkapurwala')">
+          <div class="account-avatar" style="background:#db4437;">H</div>
+          <div class="account-info">
+            <span class="account-name">Huzeifa Malkapurwala</span>
+            <span class="account-email">huzeifa@gmail.com</span>
+          </div>
+        </div>
+        <div class="account-item" onclick="selectAccount('amit.traders@gmail.com', 'Amit Traders')">
+          <div class="account-avatar" style="background:#0f9d58;">A</div>
+          <div class="account-info">
+            <span class="account-name">Amit Traders</span>
+            <span class="account-email">amit.traders@gmail.com</span>
+          </div>
+        </div>
+        <div class="account-item" onclick="showCustomEmail()">
+          <div class="account-avatar" style="background:#757575;">+</div>
+          <div class="account-info">
+            <span class="account-name">Use another account</span>
+            <span class="account-email">Sign in with a different email</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="customEmailForm" class="custom-email-form">
+      <h1>Sign in</h1>
+      <p class="subtitle">with your Google Account</p>
+      <form onsubmit="submitCustomEmail(event)">
+        <div class="field">
+          <label for="email">Email address</label>
+          <input class="field-control" id="email" type="email" placeholder="name@domain.com" required>
+        </div>
+        <div class="field">
+          <label for="name">Name (optional)</label>
+          <input class="field-control" id="name" type="text" placeholder="Your Name">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-link" type="button" onclick="showAccountList()">Back</button>
+          <button class="btn btn-primary" type="submit">Next</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function selectAccount(email, name) {
+      window.opener.postMessage({
+        type: "SSO_SUCCESS",
+        email: email,
+        name: name
+      }, window.location.origin);
+      window.close();
+    }
+
+    function showCustomEmail() {
+      document.getElementById("accountSelection").style.display = "none";
+      document.getElementById("customEmailForm").style.display = "block";
+    }
+
+    function showAccountList() {
+      document.getElementById("accountSelection").style.display = "block";
+      document.getElementById("customEmailForm").style.display = "none";
+    }
+
+    function submitCustomEmail(event) {
+      event.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const name = document.getElementById("name").value.trim() || email.split("@")[0];
+      selectAccount(email, name);
+    }
+  </script>
+</body>
+</html>

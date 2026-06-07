@@ -57,6 +57,20 @@
       <div class="settings-grid">
         <div class="settings-section">
           <div class="settings-section-head">
+            <h2>Account</h2>
+            <span class="muted" style="font-size:0.82rem;" data-user-email>Loading...</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-2); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--line);">
+            <div>
+              <strong style="color:var(--ink-strong);" data-user-name>User</strong>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top: 0.15rem;">Signed in with Google SSO</div>
+            </div>
+            <button class="btn btn-danger" type="button" data-logout-btn>Sign Out</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-head">
             <h2>Business Setup</h2>
             <button class="btn btn-primary" type="button" data-save-business>Save</button>
           </div>
@@ -98,6 +112,19 @@
             <button class="btn btn-primary" type="button" data-save-endpoint>Save Endpoint</button>
           </div>
           <div class="connection-log" data-connection-log></div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <h2>WhatsApp Connection</h2>
+            <span class="status-badge" data-whatsapp-status>Checking...</span>
+          </div>
+          <div class="qr-container" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1.5rem; background:var(--surface-2); border:1px dashed var(--line); border-radius:var(--radius); text-align:center;">
+            <div id="whatsappQrSlot" style="margin-bottom:1rem; width:220px; height:220px; display:grid; place-items:center; background:white; border-radius:var(--radius-sm); border: 8px solid white;">
+              <p style="color:#666; font-size:0.9rem; margin:0;">Loading QR...</p>
+            </div>
+            <p style="font-size:0.82rem; color:var(--muted); line-height:1.45; margin:0;">Scan from WhatsApp > Linked devices > Link a device.<br>The QR code refreshes automatically.</p>
+          </div>
         </div>
 
         <div class="settings-section">

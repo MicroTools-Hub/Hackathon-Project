@@ -185,6 +185,29 @@
     return dbPromise;
   }
 
+  function runAuthCheck(activeBusiness) {
+    const currentPath = window.location.pathname;
+    const isLoginPage = currentPath.endsWith("login.html") || currentPath.endsWith("sso-mock.html");
+    const isOnboardingPage = currentPath.endsWith("onboarding.html");
+    const user = localStorage.getItem("wl_user");
+
+    if (!user) {
+      if (!isLoginPage) {
+        window.location.href = "login.html";
+      }
+    } else {
+      if (!activeBusiness) {
+        if (!isOnboardingPage && !isLoginPage) {
+          window.location.href = "onboarding.html";
+        }
+      } else {
+        if (isLoginPage || isOnboardingPage) {
+          window.location.href = "index.html";
+        }
+      }
+    }
+  }
+
   let initPromise;
   async function init() {
     if (!initPromise) {
@@ -192,7 +215,9 @@
         const db = await openDatabase();
         if (!seedPromise) seedPromise = seedIfNeeded();
         await seedPromise;
-        if (navigator.onLine) {
+        const activeBusiness = await getActiveBusiness();
+        runAuthCheck(activeBusiness);
+        if (activeBusiness && navigator.onLine) {
           pullSync().catch(console.error);
         }
         return db;
@@ -203,25 +228,15 @@
 
   async function seedIfNeeded() {
     const db = await openDatabase();
-    const count = await db.count("businesses");
+    const count = await db.count("settings");
     if (count > 0) return;
 
     const now = Date.now();
-
-    const business = {
-      id: uuid(),
-      name: "New Business",
-      prefix: "NEW",
-      trusted_numbers: [],
-      trusted_number_meta: [],
-      created_at: now
-    };
-
     const settings = {
       id: "global",
       sse_endpoint: DEFAULT_SSE_ENDPOINT,
       sse_endpoint_manual_clear: false,
-      active_business_id: business.id,
+      active_business_id: null,
       theme: "dark",
       currency_symbol: "₹",
       connection_log: [
@@ -230,7 +245,6 @@
     };
 
     const tx = db.transaction(STORES, "readwrite");
-    tx.objectStore("businesses").put(business);
     tx.objectStore("settings").put(settings);
     await tx.done;
   }
@@ -277,7 +291,7 @@
   }
 
   async function saveSettings(patch) {
-    const db = await init();
+    const db = await openDatabase();
     const settings = await getSettings();
     const next = { ...settings, ...patch };
     if (Object.prototype.hasOwnProperty.call(patch, "sse_endpoint")) {
@@ -292,9 +306,9 @@
   }
 
   async function getActiveBusiness() {
-    const db = await init();
+    const db = await openDatabase();
     const settings = await getSettings();
-    if (settings.active_business_id) {
+    if (settings && settings.active_business_id) {
       const active = await db.get("businesses", settings.active_business_id);
       if (active) return active;
     }
@@ -995,6 +1009,40 @@
     return matches[0] || { client: null, score: 0 };
   }
 
+  async function createBusiness(data) {
+    const db = await openDatabase();
+    const business = {
+      id: uuid(),
+      name: data.name.trim(),
+      prefix: data.prefix.trim().toUpperCase(),
+      trusted_numbers: [],
+      trusted_number_meta: [],
+      created_at: Date.now()
+    };
+    await db.put("businesses", business);
+    await saveSettings({ 
+      active_business_id: business.id,
+      currency_symbol: data.currency_symbol || "₹"
+    });
+    const tx = db.transaction(["clients", "invoices", "payments"], "readwrite");
+    await tx.objectStore("clients").clear();
+    await tx.objectStore("invoices").clear();
+    await tx.objectStore("payments").clear();
+    await tx.done;
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/reset", { method: "POST" });
+        await apiFetch("/api/business", {
+          method: "PUT",
+          body: JSON.stringify(business)
+        });
+      } catch (error) {
+        console.warn("Failed to push newly created business/reset to server:", error);
+      }
+    }
+    return business;
+  }
+
   window.WLDB = {
     init,
     pullSync,
@@ -1004,6 +1052,7 @@
     getBusinesses,
     getActiveBusiness,
     setActiveBusiness,
+    createBusiness,
     getClients,
     getClient,
     addClient,

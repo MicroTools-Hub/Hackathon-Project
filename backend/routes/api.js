@@ -268,6 +268,11 @@ export function createApiRouter() {
     res.json({ business: store.updateBusiness(req.body || {}) });
   });
 
+  router.post("/reset", (req, res) => {
+    store.resetDb();
+    res.json({ ok: true });
+  });
+
   router.post("/test/text", async (req, res, next) => {
     try {
       const text = String(req.body.text || "");

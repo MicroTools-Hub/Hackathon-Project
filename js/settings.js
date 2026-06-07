@@ -20,6 +20,10 @@
     document.querySelector("[data-save-business]")?.addEventListener("click", saveBusiness);
     document.querySelector("[data-add-number]")?.addEventListener("click", addNumber);
     document.querySelector("[data-save-endpoint]")?.addEventListener("click", saveEndpoint);
+    document.querySelector("[data-logout-btn]")?.addEventListener("click", () => {
+      localStorage.removeItem("wl_user");
+      window.location.href = "login.html";
+    });
     document.querySelector("[data-test-endpoint]")?.addEventListener("click", testEndpoint);
     document.querySelector("[data-export-json]")?.addEventListener("click", () => window.WLExport.downloadJsonBackup());
     document.querySelector("[data-import-json]")?.addEventListener("click", () => document.querySelector("[data-import-json-file]").click());
@@ -43,12 +47,85 @@
     document.addEventListener("click", trustedAction);
   }
 
+  let qrPollInterval = null;
+
   async function loadAndRender() {
     state.business = await window.WLDB.getActiveBusiness();
     state.settings = await window.WLDB.getSettings();
+    renderAccount();
     renderBusinessForm();
     renderTrustedNumbers();
     renderConnection();
+    if (!qrPollInterval) {
+      startQrPolling();
+    }
+  }
+
+  function renderAccount() {
+    const userString = localStorage.getItem("wl_user");
+    if (!userString) return;
+    const user = JSON.parse(userString);
+    const emailNode = document.querySelector("[data-user-email]");
+    const nameNode = document.querySelector("[data-user-name]");
+    if (emailNode) emailNode.textContent = user.email || "";
+    if (nameNode) nameNode.textContent = user.name || "User";
+  }
+
+  async function renderWhatsAppConnection() {
+    const statusNode = document.querySelector("[data-whatsapp-status]");
+    const slotNode = document.getElementById("whatsappQrSlot");
+    if (!statusNode || !slotNode) return;
+
+    const endpoint = state.settings.sse_endpoint || "";
+    const apiBase = endpoint.replace(/\/sse\/?$/, "");
+    if (!apiBase) {
+      statusNode.textContent = "Simulator Mode";
+      statusNode.className = "status-badge status-neutral";
+      slotNode.innerHTML = `<p style="color:#666; font-size:0.9rem; margin:0; text-align:center;">Working Offline / Simulator</p>`;
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBase}/api/qr`).catch(() => null);
+      if (!response) {
+        statusNode.textContent = "Disconnected";
+        statusNode.className = "status-badge status-overdue";
+        slotNode.innerHTML = `<p style="color:#c0392b; font-size:0.85rem; margin:0; text-align:center; padding:10px;">Backend Unreachable</p>`;
+        return;
+      }
+      const data = await response.json();
+      const status = data.status || "disconnected";
+      statusNode.textContent = status;
+
+      if (status === "connected") {
+        statusNode.className = "status-badge status-paid";
+        slotNode.innerHTML = `
+          <div style="text-align:center; color:#27ae60;">
+            <svg style="width:48px; height:48px; margin:0 auto 0.5rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p style="font-weight:700; font-size:0.95rem; margin:0;">WhatsApp Connected</p>
+          </div>
+        `;
+      } else if (status === "connecting" || status === "disconnected") {
+        statusNode.className = status === "connecting" ? "status-badge status-due-soon" : "status-badge status-overdue";
+        if (data.qr || data.image) {
+          slotNode.innerHTML = `<img src="${data.qr || data.image}" alt="WhatsApp QR" style="width:200px; height:200px; display:block;">`;
+        } else {
+          slotNode.innerHTML = `<p style="color:#666; font-size:0.85rem; margin:0; text-align:center; padding:10px;">Generating QR code...</p>`;
+        }
+      } else {
+        statusNode.className = "status-badge status-overdue";
+        slotNode.innerHTML = `<p style="color:#666; font-size:0.85rem; margin:0; text-align:center; padding:10px;">Unknown status</p>`;
+      }
+    } catch (error) {
+      console.error("Failed to fetch WhatsApp QR status:", error);
+    }
+  }
+
+  function startQrPolling() {
+    renderWhatsAppConnection();
+    qrPollInterval = setInterval(renderWhatsAppConnection, 3000);
   }
 
   function renderBusinessForm() {
