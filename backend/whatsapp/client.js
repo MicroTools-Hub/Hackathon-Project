@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
-  useMultiFileAuthState
+  useMultiFileAuthState,
+  isLidUser
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
@@ -19,6 +20,29 @@ let reconnectAttempts = 0;
 let latestQrDataUrl = null;
 let reconnectTimer = null;
 const MAX_RECONNECTS = 5;
+
+/* ── LID-to-phone mapping ───────────────────────────────────── */
+const lidToPhone = new Map();   // "841301618135205" → "919637732365"
+
+function indexContact(contact) {
+  if (!contact) return;
+  // contact.id = phone JID (919637732365@s.whatsapp.net)
+  // contact.lid = LID JID   (841301618135205@lid)
+  const phoneJid = contact.id && !isLidUser(contact.id) ? contact.id : null;
+  const lidJid   = contact.lid || (contact.id && isLidUser(contact.id) ? contact.id : null);
+  if (phoneJid && lidJid) {
+    const phoneDigits = phoneJid.split("@")[0].split(":")[0];
+    const lidDigits   = lidJid.split("@")[0].split(":")[0];
+    lidToPhone.set(lidDigits, phoneDigits);
+  }
+}
+
+export function resolveLidToPhone(lidJidOrDigits) {
+  const digits = String(lidJidOrDigits || "").split("@")[0].split(":")[0];
+  return lidToPhone.get(digits) || null;
+}
+
+export function getLidMapSize() { return lidToPhone.size; }
 
 globalThis.wholesaleLedgerWhatsAppStatus ||= { connected: false, qr_pending: false };
 
@@ -53,6 +77,22 @@ export async function startWhatsAppClient() {
   socket.ev.on("connection.update", handleConnectionUpdate);
   socket.ev.on("messages.upsert", async (event) => {
     await handleIncomingMessages(socket, event);
+  });
+
+  /* ── Contact sync: build LID ↔ phone mapping ─── */
+  socket.ev.on("contacts.upsert", (contacts) => {
+    let mapped = 0;
+    for (const c of contacts) { indexContact(c); mapped++; }
+    if (mapped) logger.info(`Indexed ${mapped} contacts, LID map size: ${lidToPhone.size}`);
+  });
+  socket.ev.on("contacts.update", (updates) => {
+    for (const c of updates) indexContact(c);
+  });
+  socket.ev.on("messaging-history.set", ({ contacts }) => {
+    if (contacts) {
+      for (const c of contacts) indexContact(c);
+      logger.info(`History sync contacts indexed, LID map size: ${lidToPhone.size}`);
+    }
   });
 
   return socket;

@@ -1,5 +1,5 @@
 import PQueue from "p-queue";
-import { downloadMediaMessage, getContentType } from "@whiskeysockets/baileys";
+import { downloadMediaMessage, getContentType, isLidUser } from "@whiskeysockets/baileys";
 import pino from "pino";
 import { config } from "../config.js";
 import { store } from "../store/memory.js";
@@ -10,6 +10,7 @@ import { extractPaymentFromImageBuffer, buildPaymentResult } from "../processors
 import { jidToPhone } from "../utils/format.js";
 import { logger } from "../utils/logger.js";
 import { sendAck, sendOwnerAlert } from "./sender.js";
+import { resolveLidToPhone } from "./client.js";
 
 const queue = new PQueue({
   concurrency: config.queue.concurrency,
@@ -49,9 +50,21 @@ async function handleSingleMessage(sock, message) {
     return;
   }
 
+  /* ── Resolve LID JIDs to phone numbers ── */
+  let senderJid = isGroup ? (message.key.participant || remoteJid) : remoteJid;
+  if (!message.key?.fromMe && isLidUser(senderJid)) {
+    const resolved = resolveLidToPhone(senderJid);
+    if (resolved) {
+      logger.info("Resolved LID to phone", { lid: senderJid.split("@")[0], phone: resolved });
+      senderJid = resolved + "@s.whatsapp.net";
+    } else {
+      logger.warn("Could not resolve LID to phone", { lid: senderJid });
+    }
+  }
+
   const sourceNumber = message.key?.fromMe
     ? (sock.user?.id ? jidToPhone(sock.user.id) : "")
-    : jidToPhone(isGroup ? message.key.participant : remoteJid);
+    : jidToPhone(senderJid);
 
   if (message.key?.fromMe) {
     const myJid = sock.user?.id ? sock.user.id.split("@")[0].split(":")[0] : "";
