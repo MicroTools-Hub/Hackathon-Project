@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
@@ -22,12 +23,42 @@ let reconnectTimer = null;
 const MAX_RECONNECTS = 5;
 
 /* ── LID-to-phone mapping ───────────────────────────────────── */
-const lidToPhone = new Map();   // "841301618135205" → "919637732365"
+const lidToPhone = new Map();   // "84301618135205" → "919637732365"
+
+/**
+ * Load LID↔phone mappings from Baileys' lid-mapping-*.json files.
+ * Files named  lid-mapping-<phone>.json  contain the LID digits.
+ * Files named  lid-mapping-<lid>_reverse.json  contain the phone digits.
+ */
+async function loadLidMappingsFromDisk() {
+  try {
+    const entries = await fs.readdir(config.sessionDir);
+    let count = 0;
+    for (const entry of entries) {
+      if (!entry.startsWith("lid-mapping-") || !entry.endsWith(".json")) continue;
+      const raw = await fs.readFile(path.join(config.sessionDir, entry), "utf8").catch(() => null);
+      if (!raw) continue;
+      const value = JSON.parse(raw);   // a quoted string like "84301618135205"
+      const baseName = entry.replace("lid-mapping-", "").replace(".json", "");
+
+      if (baseName.endsWith("_reverse")) {
+        // lid-mapping-<lidDigits>_reverse.json  → value is phone digits
+        const lidDigits = baseName.replace("_reverse", "");
+        if (value) { lidToPhone.set(lidDigits, String(value)); count++; }
+      } else {
+        // lid-mapping-<phoneDigits>.json  → value is LID digits
+        const phoneDigits = baseName;
+        if (value) { lidToPhone.set(String(value), phoneDigits); count++; }
+      }
+    }
+    if (count) logger.info(`Loaded ${count} LID mappings from disk, map size: ${lidToPhone.size}`);
+  } catch (err) {
+    logger.warn("Could not load LID mappings from disk", { error: err.message });
+  }
+}
 
 function indexContact(contact) {
   if (!contact) return;
-  // contact.id = phone JID (919637732365@s.whatsapp.net)
-  // contact.lid = LID JID   (841301618135205@lid)
   const phoneJid = contact.id && !isLidUser(contact.id) ? contact.id : null;
   const lidJid   = contact.lid || (contact.id && isLidUser(contact.id) ? contact.id : null);
   if (phoneJid && lidJid) {
@@ -60,6 +91,7 @@ export function getLatestQrDataUrl() {
 
 export async function startWhatsAppClient() {
   await fs.mkdir(config.sessionDir, { recursive: true });
+  await loadLidMappingsFromDisk();
   const { state, saveCreds } = await useMultiFileAuthState(config.sessionDir);
   saveCredsHandler = saveCreds;
   const { version } = await fetchLatestBaileysVersion();
