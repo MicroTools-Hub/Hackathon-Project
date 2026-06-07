@@ -90,6 +90,7 @@ async function handleSingleMessage(sock, message) {
       contentType,
       preview: preview.slice(0, 120)
     });
+    store.touchTrustedNumber(sourceNumber);
     const context = {
       sourceNumber,
       messageId: message.key.id,

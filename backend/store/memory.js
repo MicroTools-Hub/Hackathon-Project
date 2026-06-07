@@ -465,6 +465,17 @@ export const store = {
     return business.trusted_numbers;
   },
 
+  touchTrustedNumber(phone) {
+    const normalized = normalizePhone(phone);
+    if (business.trusted_number_meta) {
+      const meta = business.trusted_number_meta.find((item) => item.phone === normalized);
+      if (meta) {
+        meta.last_message_at = Date.now();
+        saveDb();
+      }
+    }
+  },
+
   toggleTrustedNumber(phone, active) {
     const normalized = normalizePhone(phone);
     if (business.trusted_number_meta) {
