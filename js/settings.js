@@ -150,7 +150,7 @@
             <p style="font-weight:700; font-size:0.95rem; margin:0;">WhatsApp Connected</p>
           </div>
         `;
-      } else if (status === "connecting" || status === "disconnected") {
+      } else if (status === "connecting" || status === "disconnected" || status === "qr_pending") {
         statusNode.className = status === "connecting" ? "status-badge status-due-soon" : "status-badge status-overdue";
         if (data.qr || data.image) {
           slotNode.innerHTML = `<img src="${data.qr || data.image}" alt="WhatsApp QR" style="width:200px; height:200px; display:block;">`;
