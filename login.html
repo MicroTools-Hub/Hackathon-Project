@@ -72,7 +72,6 @@
       color: var(--ink-strong);
       font-weight: 700;
       transition: background 160ms ease, transform 160ms ease;
-      margin-bottom: 1.5rem;
     }
     .sso-button:hover {
       background: var(--surface-3);
@@ -114,7 +113,35 @@
       min-height: 44px;
       margin-top: 0.5rem;
     }
+
+    /* Modal for OAuth client ID configuration */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      display: none;
+      place-items: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.active {
+      display: grid;
+    }
+    .modal-box {
+      width: min(100%, 480px);
+      background: var(--surface);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: left;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
   </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div class="auth-container">
@@ -127,12 +154,19 @@
         </div>
       </div>
 
-      <button class="sso-button" type="button" id="googleSsoBtn">
-        <svg class="google-icon" viewBox="0 0 24 24" width="100%" height="100%">
-          <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.437-2.882-6.437-6.437 0-3.555 2.882-6.437 6.437-6.437 1.488 0 2.858.508 3.947 1.353l3.074-3.074C19.123 2.127 15.9 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.898 0 10.74-4.257 11.24-10.155H12.24z"/>
-        </svg>
-        Sign in with Google
-      </button>
+      <!-- Container for official Google SSO button -->
+      <div id="googleSsoBtnContainer" style="width: 100%; min-height: 46px; display: flex; justify-content: center; margin-bottom: 1.5rem;">
+        <button class="sso-button" type="button" id="googleSsoPlaceholder" onclick="openSsoModal(event)">
+          <svg class="google-icon" viewBox="0 0 24 24" width="100%" height="100%">
+            <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.437-2.882-6.437-6.437 0-3.555 2.882-6.437 6.437-6.437 1.488 0 2.858.508 3.947 1.353l3.074-3.074C19.123 2.127 15.9 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.898 0 10.74-4.257 11.24-10.155H12.24z"/>
+          </svg>
+          Sign in with Google
+        </button>
+      </div>
+
+      <div style="margin-bottom: 1.5rem; margin-top: -0.5rem;">
+        <a href="#" onclick="openSsoModal(event)" style="font-size: 0.82rem; color: var(--muted); text-decoration: underline;">Configure Google Client ID</a>
+      </div>
 
       <div class="divider">
         <span class="divider-text">or use email</span>
@@ -148,12 +182,42 @@
     </article>
   </div>
 
+  <!-- OAuth setup modal -->
+  <div id="ssoConfigModal" class="modal-overlay">
+    <div class="modal-box">
+      <div>
+        <h2 style="font-family: var(--heading); font-size: 1.25rem; color: var(--ink-strong); margin: 0 0 0.5rem;">Configure Google Client ID</h2>
+        <p style="font-size: 0.84rem; color: var(--muted); line-height: 1.45; margin: 0;">
+          To show the actual Google accounts logged in on your device, Google requires an OAuth Client ID configured for this domain.
+        </p>
+      </div>
+      
+      <p style="font-size: 0.8rem; color: var(--muted); line-height: 1.45; margin: 0; background: var(--surface-2); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+        1. Go to Google Cloud Console > APIs & Services > Credentials.<br>
+        2. Create an <strong>OAuth Client ID</strong> for Web Application.<br>
+        3. Add your current URL (e.g. <code>https://hackathon-project-bice-tau.vercel.app</code>) to <strong>Authorized JavaScript origins</strong>.<br>
+        4. Copy and paste the Client ID below.
+      </p>
+
+      <div class="field" style="margin-bottom:0;">
+        <label for="clientIdInput">Google Client ID</label>
+        <input class="field-control" id="clientIdInput" type="text" placeholder="xxxxxx-xxxxxx.apps.googleusercontent.com" style="width: 100%;">
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem;">
+        <button class="btn btn-secondary" type="button" onclick="closeSsoModal()">Cancel</button>
+        <button class="btn btn-primary" type="button" onclick="saveGoogleClientId()">Save & Initialize</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/vendor-idb.js"></script>
   <script src="js/db.js"></script>
   <script src="js/notify.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       checkAlreadyLoggedIn();
+      initializeGoogleSso();
 
       const form = document.getElementById("loginForm");
       form.addEventListener("submit", async (e) => {
@@ -161,29 +225,92 @@
         const email = document.getElementById("emailInput").value.trim();
         await handleLogin(email, email.split("@")[0]);
       });
-
-      const ssoBtn = document.getElementById("googleSsoBtn");
-      ssoBtn.addEventListener("click", () => {
-        // Open mock SSO window styled exactly like a real Google Sign-in popup
-        const width = 500;
-        const height = 600;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-        window.open("sso-mock.html", "GoogleSSO", `width=${width},height=${height},top=${top},left=${left}`);
-      });
-
-      // Listen for message from Google SSO Mock window
-      window.addEventListener("message", async (event) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data && event.data.type === "SSO_SUCCESS") {
-          await handleLogin(event.data.email, event.data.name);
-        }
-      });
     });
+
+    function initializeGoogleSso() {
+      const clientId = localStorage.getItem("wl_google_client_id");
+      if (clientId) {
+        // Wait for script to load
+        const checkSdk = setInterval(() => {
+          if (window.google && window.google.accounts) {
+            clearInterval(checkSdk);
+            try {
+              google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleCredentialResponse
+              });
+              
+              google.accounts.id.renderButton(
+                document.getElementById("googleSsoBtnContainer"),
+                { 
+                  theme: "outline", 
+                  size: "large", 
+                  width: document.getElementById("googleSsoBtnContainer").offsetWidth || 360,
+                  shape: "rectangular" 
+                }
+              );
+              
+              google.accounts.id.prompt();
+            } catch (err) {
+              console.error("Google SSO initialization failed:", err);
+              localStorage.removeItem("wl_google_client_id");
+              window.location.reload();
+            }
+          }
+        }, 100);
+      }
+    }
+
+    function handleCredentialResponse(response) {
+      const payload = decodeJwt(response.credential);
+      if (payload && payload.email) {
+        handleLogin(payload.email, payload.name, payload.picture);
+      } else {
+        window.WLNotify.error("Google SSO Failed", "Unable to retrieve profile information.");
+      }
+    }
+
+    function decodeJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        console.error("Failed to decode Google SSO token:", e);
+        return null;
+      }
+    }
 
     async function checkAlreadyLoggedIn() {
       const user = localStorage.getItem("wl_user");
       if (user) {
+        try {
+          await window.WLDB.init();
+          const active = await window.WLDB.getActiveBusiness();
+          if (active) {
+            window.location.href = "index.html";
+          } else {
+            window.location.href = "onboarding.html";
+          }
+        } catch (e) {
+          window.location.href = "onboarding.html";
+        }
+      }
+    }
+
+    async function handleLogin(email, name, picture = "") {
+      localStorage.setItem("wl_user", JSON.stringify({
+        email,
+        name: name || email.split("@")[0],
+        picture: picture || "",
+        logged_at: Date.now()
+      }));
+      window.WLNotify.success("Welcome!", email);
+      
+      try {
         await window.WLDB.init();
         const active = await window.WLDB.getActiveBusiness();
         if (active) {
@@ -191,31 +318,39 @@
         } else {
           window.location.href = "onboarding.html";
         }
+      } catch (err) {
+        console.error("Error during authentication db initialization:", err);
+        // Fallback redirection to bypass any potential DB script error
+        window.location.href = "onboarding.html";
       }
     }
 
-    async function handleLogin(email, name, avatarColor) {
-      if (!avatarColor) {
-        const colors = ["#4285F4", "#db4437", "#f4b400", "#0f9d58", "#ab47bc", "#00acc1"];
-        avatarColor = colors[Math.floor(Math.random() * colors.length)];
+    // Modal control functions
+    function openSsoModal(event) {
+      if (event) event.preventDefault();
+      document.getElementById("ssoConfigModal").classList.add("active");
+      const saved = localStorage.getItem("wl_google_client_id");
+      if (saved) {
+        document.getElementById("clientIdInput").value = saved;
       }
-      
-      localStorage.setItem("wl_user", JSON.stringify({
-        email,
-        name: name || email.split("@")[0],
-        picture: "",
-        avatar_color: avatarColor,
-        logged_at: Date.now()
-      }));
-      window.WLNotify.success("Welcome!", email);
-      
-      await window.WLDB.init();
-      const active = await window.WLDB.getActiveBusiness();
-      if (active) {
-        window.location.href = "index.html";
-      } else {
-        window.location.href = "onboarding.html";
+    }
+
+    function closeSsoModal() {
+      document.getElementById("ssoConfigModal").classList.remove("active");
+    }
+
+    function saveGoogleClientId() {
+      const val = document.getElementById("clientIdInput").value.trim();
+      if (!val) {
+        window.WLNotify.error("Validation error", "Google Client ID is required.");
+        return;
       }
+      localStorage.setItem("wl_google_client_id", val);
+      window.WLNotify.success("Settings saved", "Initializing Google Sign-in...");
+      closeSsoModal();
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 500);
     }
   </script>
 </body>
