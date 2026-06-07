@@ -153,28 +153,8 @@
       <h1>Choose an account</h1>
       <p class="subtitle">to continue to WholesaleLedger</p>
       
-      <div class="account-list">
-        <div class="account-item" onclick="selectAccount('huzeifa@gmail.com', 'Huzeifa Malkapurwala')">
-          <div class="account-avatar" style="background:#db4437;">H</div>
-          <div class="account-info">
-            <span class="account-name">Huzeifa Malkapurwala</span>
-            <span class="account-email">huzeifa@gmail.com</span>
-          </div>
-        </div>
-        <div class="account-item" onclick="selectAccount('amit.traders@gmail.com', 'Amit Traders')">
-          <div class="account-avatar" style="background:#0f9d58;">A</div>
-          <div class="account-info">
-            <span class="account-name">Amit Traders</span>
-            <span class="account-email">amit.traders@gmail.com</span>
-          </div>
-        </div>
-        <div class="account-item" onclick="showCustomEmail()">
-          <div class="account-avatar" style="background:#757575;">+</div>
-          <div class="account-info">
-            <span class="account-name">Use another account</span>
-            <span class="account-email">Sign in with a different email</span>
-          </div>
-        </div>
+      <div class="account-list" id="accountsListSlot">
+        <!-- Loaded dynamically -->
       </div>
     </div>
 
@@ -199,18 +179,82 @@
   </div>
 
   <script>
-    function selectAccount(email, name) {
-      window.opener.postMessage({
-        type: "SSO_SUCCESS",
-        email: email,
-        name: name
-      }, window.location.origin);
-      window.close();
+    document.addEventListener("DOMContentLoaded", () => {
+      renderAccounts();
+    });
+
+    function getSavedAccounts() {
+      try {
+        const data = localStorage.getItem("wl_saved_accounts");
+        return data ? JSON.parse(data) : [];
+      } catch (e) {
+        return [];
+      }
     }
 
-    function showCustomEmail() {
+    function saveAccount(email, name) {
+      const accounts = getSavedAccounts();
+      const exists = accounts.find(a => a.email.toLowerCase() === email.toLowerCase());
+      if (!exists) {
+        accounts.push({ email, name });
+        localStorage.setItem("wl_saved_accounts", JSON.stringify(accounts));
+      }
+    }
+
+    function getAvatarColor(email) {
+      const colors = ["#db4437", "#0f9d58", "#4285f4", "#f4b400", "#ab47bc", "#00acc1", "#ff7043"];
+      let hash = 0;
+      for (let i = 0; i < email.length; i++) {
+        hash = email.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return colors[Math.abs(hash) % colors.length];
+    }
+
+    function renderAccounts() {
+      const accounts = getSavedAccounts();
+      const listSlot = document.getElementById("accountsListSlot");
+      
+      if (accounts.length === 0) {
+        showCustomEmail(false);
+        return;
+      }
+      
+      let html = "";
+      accounts.forEach(acc => {
+        const color = getAvatarColor(acc.email);
+        const letter = (acc.name || acc.email || "U").charAt(0).toUpperCase();
+        html += `
+          <div class="account-item" onclick="selectAccount('${escapeHtml(acc.email)}', '${escapeHtml(acc.name)}')">
+            <div class="account-avatar" style="background:${color};">${letter}</div>
+            <div class="account-info">
+              <span class="account-name">${escapeHtml(acc.name)}</span>
+              <span class="account-email">${escapeHtml(acc.email)}</span>
+            </div>
+          </div>
+        `;
+      });
+      
+      html += `
+        <div class="account-item" onclick="showCustomEmail(true)">
+          <div class="account-avatar" style="background:#757575;">+</div>
+          <div class="account-info">
+            <span class="account-name">Use another account</span>
+            <span class="account-email">Sign in with a different email</span>
+          </div>
+        </div>
+      `;
+      
+      listSlot.innerHTML = html;
+      showAccountList();
+    }
+
+    function showCustomEmail(showBack = true) {
       document.getElementById("accountSelection").style.display = "none";
       document.getElementById("customEmailForm").style.display = "block";
+      const backBtn = document.querySelector("#customEmailForm .btn-link");
+      if (backBtn) {
+        backBtn.style.display = showBack ? "block" : "none";
+      }
     }
 
     function showAccountList() {
@@ -218,11 +262,27 @@
       document.getElementById("customEmailForm").style.display = "none";
     }
 
+    function selectAccount(email, name) {
+      saveAccount(email, name);
+      window.opener.postMessage({
+        type: "SSO_SUCCESS",
+        email: email,
+        name: name,
+        avatar_color: getAvatarColor(email)
+      }, window.location.origin);
+      window.close();
+    }
+
     function submitCustomEmail(event) {
       event.preventDefault();
       const email = document.getElementById("email").value.trim();
       const name = document.getElementById("name").value.trim() || email.split("@")[0];
       selectAccount(email, name);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
   </script>
 </body>

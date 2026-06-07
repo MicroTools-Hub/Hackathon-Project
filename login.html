@@ -156,7 +156,7 @@
 
       <!-- Container for official Google SSO button -->
       <div id="googleSsoBtnContainer" style="width: 100%; min-height: 46px; display: flex; justify-content: center; margin-bottom: 1.5rem;">
-        <button class="sso-button" type="button" id="googleSsoPlaceholder" onclick="openSsoModal(event)">
+        <button class="sso-button" type="button" id="googleSsoPlaceholder" onclick="handleGoogleSsoClick(event)">
           <svg class="google-icon" viewBox="0 0 24 24" width="100%" height="100%">
             <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.437-2.882-6.437-6.437 0-3.555 2.882-6.437 6.437-6.437 1.488 0 2.858.508 3.947 1.353l3.074-3.074C19.123 2.127 15.9 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c5.898 0 10.74-4.257 11.24-10.155H12.24z"/>
           </svg>
@@ -301,28 +301,56 @@
       }
     }
 
-    async function handleLogin(email, name, picture = "") {
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data && event.data.type === "SSO_SUCCESS") {
+        handleLogin(event.data.email, event.data.name, "", event.data.avatar_color);
+      }
+    });
+
+    function handleGoogleSsoClick(event) {
+      if (event) event.preventDefault();
+      const clientId = localStorage.getItem("wl_google_client_id");
+      if (clientId) {
+        return;
+      }
+      
+      const width = 500;
+      const height = 600;
+      const left = (window.screen.width - width) / 2;
+      const top = (window.screen.height - height) / 2;
+      
+      const popup = window.open(
+        "sso-mock.html",
+        "GoogleSignIn",
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+      );
+      
+      if (popup) {
+        popup.focus();
+      }
+    }
+
+    async function handleLogin(email, name, picture = "", avatar_color = "") {
+      try {
+        await window.WLDB.init();
+        await window.WLDB.clearLocalLedgerData();
+      } catch (err) {
+        console.error("Error clearing DB during handleLogin:", err);
+      }
+
       localStorage.setItem("wl_user", JSON.stringify({
         email,
         name: name || email.split("@")[0],
         picture: picture || "",
+        avatar_color: avatar_color || "",
         logged_at: Date.now()
       }));
       window.WLNotify.success("Welcome!", email);
       
-      try {
-        await window.WLDB.init();
-        const active = await window.WLDB.getActiveBusiness();
-        if (active) {
-          window.location.href = "index.html";
-        } else {
-          window.location.href = "onboarding.html";
-        }
-      } catch (err) {
-        console.error("Error during authentication db initialization:", err);
-        // Fallback redirection to bypass any potential DB script error
+      window.setTimeout(() => {
         window.location.href = "onboarding.html";
-      }
+      }, 500);
     }
 
     // Modal control functions

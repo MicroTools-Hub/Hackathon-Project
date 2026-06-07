@@ -106,7 +106,19 @@ async function handleConnectionUpdate(update) {
         startWhatsAppClient().catch((error) => logger.error("WhatsApp reconnect failed", { error: error.message }));
       }, 5000);
     } else if (loggedOut) {
-      logger.warn("WhatsApp logged out. Delete backend/sessions and restart to scan again.");
+      logger.warn("WhatsApp logged out. Clearing session files and restarting WhatsApp client to generate new QR...");
+      (async () => {
+        try {
+          await stopWhatsAppClient();
+          await fs.rm(config.sessionDir, { recursive: true, force: true });
+          logger.info("Session directory cleared. Initiating fresh connection in 2 seconds...");
+          setTimeout(() => {
+            startWhatsAppClient().catch((error) => logger.error("WhatsApp restart failed after logout:", { error: error.message }));
+          }, 2000);
+        } catch (err) {
+          logger.error("Failed to clear session files on logout:", { error: err.message });
+        }
+      })();
     }
   }
 }

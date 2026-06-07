@@ -20,8 +20,13 @@
     document.querySelector("[data-save-business]")?.addEventListener("click", saveBusiness);
     document.querySelector("[data-add-number]")?.addEventListener("click", addNumber);
     document.querySelector("[data-save-endpoint]")?.addEventListener("click", saveEndpoint);
-    document.querySelector("[data-logout-btn]")?.addEventListener("click", () => {
+    document.querySelector("[data-logout-btn]")?.addEventListener("click", async () => {
       localStorage.removeItem("wl_user");
+      try {
+        await window.WLDB.clearLocalLedgerData();
+      } catch (err) {
+        console.error("Failed to clear local ledger data on logout:", err);
+      }
       window.location.href = "login.html";
     });
     document.getElementById("configSsoBtn")?.addEventListener("click", openSsoModal);

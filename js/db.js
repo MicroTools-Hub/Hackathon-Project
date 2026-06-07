@@ -880,6 +880,25 @@
     return newBusiness;
   }
 
+  async function clearLocalLedgerData() {
+    const db = await openDatabase();
+    const tx = db.transaction(["businesses", "clients", "invoices", "payments", "sync_queue"], "readwrite");
+    await tx.objectStore("businesses").clear();
+    await tx.objectStore("clients").clear();
+    await tx.objectStore("invoices").clear();
+    await tx.objectStore("payments").clear();
+    await tx.objectStore("sync_queue").clear();
+    await tx.done;
+    await saveSettings({ active_business_id: null });
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/reset", { method: "POST" });
+      } catch (error) {
+        console.warn("Failed to reset backend on local ledger data clear:", error);
+      }
+    }
+  }
+
   async function queueSyncAction(type, payload) {
     const db = await init();
     const action = { id: uuid(), type, payload, status: "queued", created_at: Date.now() };
@@ -1085,6 +1104,7 @@
     clearActiveBusinessData,
     clearPayments,
     deleteActiveBusiness,
+    clearLocalLedgerData,
     queueSyncAction,
     fuzzyMatchClient,
     formatCurrency,
