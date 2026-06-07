@@ -24,6 +24,9 @@
       localStorage.removeItem("wl_user");
       window.location.href = "login.html";
     });
+    document.getElementById("configSsoBtn")?.addEventListener("click", openSsoModal);
+    document.getElementById("closeSsoModalBtn")?.addEventListener("click", closeSsoModal);
+    document.getElementById("saveSsoClientIdBtn")?.addEventListener("click", saveSsoClientId);
     document.querySelector("[data-test-endpoint]")?.addEventListener("click", testEndpoint);
     document.querySelector("[data-export-json]")?.addEventListener("click", () => window.WLExport.downloadJsonBackup());
     document.querySelector("[data-import-json]")?.addEventListener("click", () => document.querySelector("[data-import-json-file]").click());
@@ -69,6 +72,33 @@
     const nameNode = document.querySelector("[data-user-name]");
     if (emailNode) emailNode.textContent = user.email || "";
     if (nameNode) nameNode.textContent = user.name || "User";
+
+    // Avatar image rendering
+    const avatarImg = document.getElementById("userAvatar");
+    if (avatarImg) {
+      if (user.picture) {
+        avatarImg.src = user.picture;
+        avatarImg.style.display = "block";
+      } else {
+        avatarImg.style.display = "none";
+      }
+    }
+
+    // SSO Configuration status text rendering
+    const clientId = localStorage.getItem("wl_google_client_id");
+    const ssoStatusText = document.getElementById("ssoStatusText");
+    const configSsoBtn = document.getElementById("configSsoBtn");
+    if (ssoStatusText) {
+      if (clientId) {
+        ssoStatusText.textContent = "SSO: Active (Client ID Set)";
+        ssoStatusText.style.color = "var(--green)";
+        if (configSsoBtn) configSsoBtn.textContent = "Change ID";
+      } else {
+        ssoStatusText.textContent = "SSO: Not configured";
+        ssoStatusText.style.color = "var(--muted)";
+        if (configSsoBtn) configSsoBtn.textContent = "Setup ID";
+      }
+    }
   }
 
   async function renderWhatsAppConnection() {
@@ -261,6 +291,34 @@
     if (state.confirmAction) await state.confirmAction();
     state.confirmAction = null;
     window.WLUI.closeModal(modal);
+  }
+
+  function openSsoModal() {
+    const modal = document.getElementById("ssoConfigModal");
+    if (modal) {
+      modal.style.display = "grid";
+      const saved = localStorage.getItem("wl_google_client_id");
+      const input = document.getElementById("clientIdInput");
+      if (input) input.value = saved || "";
+    }
+  }
+
+  function closeSsoModal() {
+    const modal = document.getElementById("ssoConfigModal");
+    if (modal) modal.style.display = "none";
+  }
+
+  function saveSsoClientId() {
+    const input = document.getElementById("clientIdInput");
+    const val = input ? input.value.trim() : "";
+    if (!val) {
+      window.WLNotify.error("Validation error", "Google Client ID is required.");
+      return;
+    }
+    localStorage.setItem("wl_google_client_id", val);
+    window.WLNotify.success("Settings saved", "Google SSO Client ID updated");
+    closeSsoModal();
+    loadAndRender();
   }
 
   function escape(value) {

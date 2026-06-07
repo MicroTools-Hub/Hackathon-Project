@@ -60,12 +60,21 @@
             <h2>Account</h2>
             <span class="muted" style="font-size:0.82rem;" data-user-email>Loading...</span>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-2); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--line);">
-            <div>
-              <strong style="color:var(--ink-strong);" data-user-name>User</strong>
-              <div style="font-size:0.75rem; color:var(--muted); margin-top: 0.15rem;">Signed in with Google SSO</div>
+          <div style="display:flex; flex-direction:column; gap:0.75rem; background:var(--surface-2); padding:1rem; border-radius:var(--radius-sm); border:1px solid var(--line);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:0.75rem;">
+                <img id="userAvatar" src="" alt="" style="width:36px; height:36px; border-radius:50%; display:none; border:1px solid var(--line-strong); object-fit: cover;">
+                <div>
+                  <strong style="color:var(--ink-strong);" data-user-name>User</strong>
+                  <div style="font-size:0.75rem; color:var(--muted); margin-top: 0.15rem;">Signed in with Google SSO</div>
+                </div>
+              </div>
+              <button class="btn btn-danger" type="button" data-logout-btn>Sign Out</button>
             </div>
-            <button class="btn btn-danger" type="button" data-logout-btn>Sign Out</button>
+            <div style="border-top:1px solid var(--line); padding-top:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+              <span class="muted" style="font-size:0.75rem;" id="ssoStatusText">SSO: Not configured</span>
+              <button class="btn" type="button" id="configSsoBtn" style="padding: 4px 10px; font-size:0.78rem; border:1px solid var(--line-strong);">Setup Client ID</button>
+            </div>
           </div>
         </div>
 
@@ -204,6 +213,35 @@
     <button type="button" data-open-export><span class="nav-icon" aria-hidden="true">$</span><span>Export</span></button>
     <a href="settings.html" data-nav="settings"><span class="nav-icon" aria-hidden="true">...</span><span>Settings</span></a>
   </nav>
+
+  <!-- Google SSO Config Modal -->
+  <div id="ssoConfigModal" class="modal-overlay" style="position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); display: none; place-items: center; padding: 1.5rem;">
+    <div class="modal-box" style="width: min(100%, 480px); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 2rem; text-align: left; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 1.25rem;">
+      <div>
+        <h2 style="font-family: var(--heading); font-size: 1.25rem; color: var(--ink-strong); margin: 0 0 0.5rem;">Configure Google Client ID</h2>
+        <p style="font-size: 0.84rem; color: var(--muted); line-height: 1.45; margin: 0;">
+          To use real Google SSO authentication on Vercel or localhost, you must create a Client ID in the Google Cloud Console.
+        </p>
+      </div>
+      
+      <p style="font-size: 0.8rem; color: var(--muted); line-height: 1.45; margin: 0; background: var(--surface-2); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--line);">
+        1. Go to Google Cloud Console > APIs & Services > Credentials.<br>
+        2. Create an <strong>OAuth Client ID</strong> for Web Application.<br>
+        3. Add your current URL (e.g. <code>https://hackathon-project-bice-tau.vercel.app</code>) to <strong>Authorized JavaScript origins</strong>.<br>
+        4. Copy and paste the Client ID below.
+      </p>
+
+      <div class="field" style="margin-bottom:0;">
+        <label for="clientIdInput">OAuth Client ID</label>
+        <input class="field-control" id="clientIdInput" type="text" placeholder="xxxxxx-xxxxxx.apps.googleusercontent.com" style="width: 100%;">
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:0.5rem;">
+        <button class="btn btn-secondary" type="button" id="closeSsoModalBtn">Cancel</button>
+        <button class="btn btn-primary" type="button" id="saveSsoClientIdBtn">Save Client ID</button>
+      </div>
+    </div>
+  </div>
 
   <script src="js/vendor/idb.umd.js"></script>
   <script src="js/vendor-idb.js"></script>
