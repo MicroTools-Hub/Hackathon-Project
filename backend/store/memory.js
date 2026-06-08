@@ -352,7 +352,20 @@ export const store = {
         created_at: Date.now()
       };
     }
+    const oldId = business ? business.id : null;
     if (patch.id) business.id = patch.id;
+    if (patch.id && patch.id !== oldId) {
+      for (const client of clients) {
+        if (!client.business_id || client.business_id === oldId) {
+          client.business_id = patch.id;
+        }
+      }
+      for (const trans of transactions) {
+        if (!trans.business_id || trans.business_id === oldId) {
+          trans.business_id = patch.id;
+        }
+      }
+    }
     if (patch.name) business.name = String(patch.name).trim();
     if (patch.prefix) business.prefix = String(patch.prefix).trim().toUpperCase();
     if (patch.owner_number) business.owner_number = normalizePhone(patch.owner_number);
