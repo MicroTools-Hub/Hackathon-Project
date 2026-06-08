@@ -5,7 +5,7 @@
   const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
   const DEFAULT_SSE_ENDPOINT = isLocalHost
     ? "http://127.0.0.1:3000/sse"
-    : "https://ecological-discs-dominant-dvd.trycloudflare.com/sse";
+    : "https://smirk-blighted-marvelous.ngrok-free.dev/sse";
   const STORES = ["businesses", "clients", "invoices", "payments", "settings", "sync_queue"];
   let dbPromise;
   let seedPromise;
@@ -301,11 +301,10 @@
     const resolvedDefaultEndpoint = isLocalHost
       ? "http://127.0.0.1:3000/sse"
       : DEFAULT_SSE_ENDPOINT;
-
     if (settings) {
-      // If on localhost and the endpoint is pointing to trycloudflare, override it to local backend
-      if (isLocalHost && settings.sse_endpoint && settings.sse_endpoint.includes("trycloudflare.com")) {
-        settings.sse_endpoint = "http://127.0.0.1:3000/sse";
+      // If the endpoint is pointing to the old trycloudflare, migrate it to the active endpoint
+      if (settings.sse_endpoint && settings.sse_endpoint.includes("trycloudflare.com")) {
+        settings.sse_endpoint = resolvedDefaultEndpoint;
         await db.put("settings", settings);
       }
       if (!settings.sse_endpoint && !settings.sse_endpoint_manual_clear) {
