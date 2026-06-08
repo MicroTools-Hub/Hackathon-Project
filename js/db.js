@@ -83,11 +83,11 @@
       const tx = db.transaction(["businesses", "clients", "invoices", "payments"], "readwrite");
       const bStore = tx.objectStore("businesses");
       await bStore.clear();
-      await bStore.put(businessData.business);
+      await bStore.put({ ...businessData.business, synced: true, updated_at: new Date().toISOString() });
       const cStore = tx.objectStore("clients");
       await cStore.clear();
       for (const client of clientsData.clients) {
-        await cStore.put(client);
+        await cStore.put({ ...client, synced: true, updated_at: new Date().toISOString() });
       }
       const iStore = tx.objectStore("invoices");
       const pStore = tx.objectStore("payments");
@@ -100,7 +100,11 @@
             business_id: trans.business_id || businessData.business.id,
             client_id: trans.client_id,
             amount: Number(trans.amount) || 0,
-            due_date: Number(trans.due_date_at_transaction || trans.recorded_at + 30 * DAY),
+            due_date: Number(
+              trans.due_date ||
+              trans.due_date_at_transaction ||
+              trans.recorded_at + Number(trans.credit_days || (clientsData.clients.find(c => c.id === trans.client_id)?.payment_cycle_days) || 30) * DAY
+            ),
             created_at: Number(trans.recorded_at),
             notes: trans.description || trans.raw_input || "WhatsApp goods entry",
             status: trans.status || "confirmed",
@@ -112,7 +116,7 @@
             business_prefix: trans.business_prefix || null,
             client_name: trans.client_name || ""
           };
-          await iStore.put(invoice);
+          await iStore.put({ ...invoice, synced: true, updated_at: new Date().toISOString() });
         } else if (trans.type === "payment") {
           const payment = {
             id: trans.id,
@@ -133,7 +137,7 @@
             client_name: trans.client_name || "",
             match_score: Number(trans.match_score ?? 1)
           };
-          await pStore.put(payment);
+          await pStore.put({ ...payment, synced: true, updated_at: new Date().toISOString() });
         }
       }
       await tx.done;
@@ -190,7 +194,7 @@
 
   function runAuthCheck(activeBusiness) {
     const currentPath = window.location.pathname;
-    const isLoginPage = currentPath.endsWith("login.html") || currentPath.endsWith("sso-mock.html");
+    const isLoginPage = currentPath.endsWith("login.html") || currentPath.endsWith("signup.html") || currentPath.endsWith("sso-mock.html");
     const isOnboardingPage = currentPath.endsWith("onboarding.html");
     const user = localStorage.getItem("wl_user");
 
@@ -222,6 +226,9 @@
         runAuthCheck(activeBusiness);
         if (activeBusiness && navigator.onLine) {
           pullSync().catch(console.error);
+        }
+        if (activeBusiness && window.WLSync) {
+          window.WLSync.start();
         }
         return db;
       })();
@@ -350,7 +357,9 @@
       phone: data.phone.trim(),
       credit_limit: Number(data.credit_limit) || 0,
       payment_cycle_days: Number(data.payment_cycle_days) || 30,
-      created_at: Date.now()
+      created_at: Date.now(),
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     await db.put("clients", client);
     if (navigator.onLine) {
@@ -373,7 +382,7 @@
     const db = await init();
     const client = await db.get("clients", id);
     if (!client) throw new Error("Client not found");
-    const next = { ...client, ...patch };
+    const next = { ...client, ...patch, synced: false, updated_at: new Date().toISOString() };
     await db.put("clients", next);
     return next;
   }
@@ -517,8 +526,9 @@
     const clientId = data.client_id || null;
     const recordedAt = Number(data.recorded_at) || Date.now();
     const client = clientId ? await getClient(clientId) : null;
+    const cycleDays = Number(data.credit_days || client?.payment_cycle_days || 30);
     const dueDate = Number(data.due_date || data.due_date_at_transaction)
-      || recordedAt + Number(client?.payment_cycle_days || 30) * DAY;
+      || recordedAt + cycleDays * DAY;
     const invoice = {
       id: data.id || data.transaction_id || uuid(),
       business_id: businessId,
@@ -534,7 +544,9 @@
       confidence: Number(data.confidence ?? 1),
       transaction_id: data.transaction_id || data.id || null,
       business_prefix: data.business_prefix || null,
-      client_name: data.client_name || ""
+      client_name: data.client_name || "",
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     await db.put("invoices", invoice);
     await refreshInvoiceStatuses(businessId);
@@ -566,7 +578,9 @@
       notes: data.notes || "",
       business_prefix: data.business_prefix || null,
       client_name: data.client_name || "",
-      match_score: Number(data.match_score ?? 0)
+      match_score: Number(data.match_score ?? 0),
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     await db.put("payments", payment);
     await refreshInvoiceStatuses(businessId);
@@ -593,7 +607,7 @@
     const db = await init();
     const current = await db.get("payments", id);
     if (!current) throw new Error("Payment not found");
-    const next = { ...current, ...patch };
+    const next = { ...current, ...patch, synced: false, updated_at: new Date().toISOString() };
     await db.put("payments", next);
     await refreshInvoiceStatuses(next.business_id);
     return next;
@@ -608,7 +622,9 @@
       ...patch,
       amount: Number(patch.amount ?? current.amount) || 0,
       confidence: Number(patch.confidence ?? current.confidence ?? 1),
-      status: "confirmed"
+      status: "confirmed",
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     if (next.client_id && !next.invoice_id) {
       next.invoice_id = await chooseInvoiceForPayment(next.client_id);
@@ -698,7 +714,9 @@
     const nextBusiness = {
       ...business,
       name: patch.name?.trim() || business.name,
-      prefix: patch.prefix?.trim().toUpperCase() || business.prefix
+      prefix: patch.prefix?.trim().toUpperCase() || business.prefix,
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     await db.put("businesses", nextBusiness);
     if (patch.currency_symbol) await saveSettings({ currency_symbol: patch.currency_symbol.trim() });
@@ -891,6 +909,7 @@
     await tx.objectStore("sync_queue").clear();
     await tx.done;
     await saveSettings({ active_business_id: null });
+    localStorage.removeItem('wl_last_sync_time');
     if (navigator.onLine) {
       try {
         await apiFetch("/api/reset", { method: "POST" });
@@ -1039,7 +1058,9 @@
       prefix: data.prefix.trim().toUpperCase(),
       trusted_numbers: [],
       trusted_number_meta: [],
-      created_at: Date.now()
+      created_at: Date.now(),
+      synced: false,
+      updated_at: new Date().toISOString()
     };
     await db.put("businesses", business);
     await saveSettings({ 

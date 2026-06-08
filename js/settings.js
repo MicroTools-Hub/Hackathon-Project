@@ -20,15 +20,8 @@
     document.querySelector("[data-save-business]")?.addEventListener("click", saveBusiness);
     document.querySelector("[data-add-number]")?.addEventListener("click", addNumber);
     document.querySelector("[data-save-endpoint]")?.addEventListener("click", saveEndpoint);
-    document.querySelector("[data-logout-btn]")?.addEventListener("click", async () => {
-      localStorage.removeItem("wl_user");
-      try {
-        await window.WLDB.clearLocalLedgerData();
-      } catch (err) {
-        console.error("Failed to clear local ledger data on logout:", err);
-      }
-      window.location.href = "login.html";
-    });
+    document.querySelector("[data-logout-btn]")?.addEventListener("click", handleLogout);
+    document.querySelector("[data-supabase-signout]")?.addEventListener("click", handleLogout);
     document.getElementById("configSsoBtn")?.addEventListener("click", openSsoModal);
     document.getElementById("closeSsoModalBtn")?.addEventListener("click", closeSsoModal);
     document.getElementById("saveSsoClientIdBtn")?.addEventListener("click", saveSsoClientId);
@@ -332,6 +325,23 @@
     window.WLNotify.success("Settings saved", "Google SSO Client ID updated");
     closeSsoModal();
     loadAndRender();
+  }
+
+  async function handleLogout() {
+    try {
+      if (window.WLSync) window.WLSync.stop();
+    } catch (e) { console.warn("WLSync.stop failed:", e); }
+    try {
+      if (window.WLAuth) await window.WLAuth.signOut();
+    } catch (e) { console.warn("WLAuth.signOut failed:", e); }
+    localStorage.removeItem("wl_user");
+    localStorage.removeItem("wl_last_sync_time");
+    try {
+      await window.WLDB.clearLocalLedgerData();
+    } catch (err) {
+      console.error("Failed to clear local ledger data on logout:", err);
+    }
+    window.location.href = "login.html";
   }
 
   function escape(value) {

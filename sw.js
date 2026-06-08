@@ -1,4 +1,4 @@
-const CACHE_NAME = "wholesaleledger-static-v18";
+const CACHE_NAME = "wholesaleledger-static-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./offline.html",
   "./login.html",
   "./sso-mock.html",
+  "./signup.html",
   "./onboarding.html",
   "./manifest.json",
   "./css/base.css",
@@ -60,7 +61,7 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
 
-  if (request.url.includes("/api/") || request.headers.get("accept")?.includes("text/event-stream") || request.url.includes("/events")) {
+  if (request.url.includes("/api/") || request.headers.get("accept")?.includes("text/event-stream") || request.url.includes("/events") || request.url.includes("cdn.jsdelivr.net") || request.url.includes("supabase.co")) {
     event.respondWith(fetch(request));
     return;
   }

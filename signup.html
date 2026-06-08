@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login · WholesaleLedger</title>
-  <meta name="description" content="Sign in to WholesaleLedger — AI-powered ledgers and payment tracking for wholesale businesses.">
+  <title>Create Account · WholesaleLedger</title>
+  <meta name="description" content="Create your WholesaleLedger account — AI-powered ledgers and payment tracking for wholesale businesses.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -215,6 +215,24 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ── Success Message ─────────────────────────────────────────────── */
+    .auth-success {
+      display: none;
+      padding: 0.72rem 0.88rem;
+      border: 1px solid rgba(39, 174, 96, 0.38);
+      border-radius: var(--radius-sm);
+      background: rgba(39, 174, 96, 0.12);
+      color: #a6f2c6;
+      font-size: 0.86rem;
+      text-align: left;
+      line-height: 1.4;
+      animation: error-in 0.25s ease;
+    }
+
+    .auth-success.is-visible {
+      display: block;
+    }
+
     /* ── Footer Link ─────────────────────────────────────────────────── */
     .auth-link {
       margin-top: 1.5rem;
@@ -234,16 +252,11 @@
       text-decoration: underline;
     }
 
-    /* ── Decorative dots ─────────────────────────────────────────────── */
-    .auth-card::before {
-      content: "";
-      position: absolute;
-      top: -80px;
-      right: -80px;
-      width: 200px;
-      height: 200px;
-      background: radial-gradient(circle, rgba(212, 144, 10, 0.06) 0%, transparent 70%);
-      pointer-events: none;
+    /* ── Password hint ───────────────────────────────────────────────── */
+    .field-hint {
+      font-size: 0.74rem;
+      color: var(--muted-2);
+      margin-top: 0.15rem;
     }
   </style>
 </head>
@@ -254,7 +267,7 @@
       <div class="auth-logo">
         <div class="logo-icon">WL</div>
         <div>
-          <h1 class="logo-text">WholesaleLedger</h1>
+          <h1 class="logo-text">Create Account</h1>
           <p class="logo-desc">AI-Powered Ledgers &amp; Payment Tracking</p>
         </div>
       </div>
@@ -262,8 +275,23 @@
       <!-- Error Area -->
       <div class="auth-error" id="authError"></div>
 
-      <!-- Login Form -->
-      <form class="auth-form" id="loginForm" autocomplete="on">
+      <!-- Success Area (email confirmation) -->
+      <div class="auth-success" id="authSuccess"></div>
+
+      <!-- Signup Form -->
+      <form class="auth-form" id="signupForm" autocomplete="on">
+        <div class="auth-field">
+          <label for="businessNameInput">Business Name</label>
+          <input
+            class="field-control"
+            id="businessNameInput"
+            type="text"
+            placeholder="Sharma Textiles Pvt. Ltd."
+            autocomplete="organization"
+            required
+          >
+        </div>
+
         <div class="auth-field">
           <label for="emailInput">Email Address</label>
           <input
@@ -282,22 +310,36 @@
             class="field-control"
             id="passwordInput"
             type="password"
-            placeholder="Enter your password"
-            autocomplete="current-password"
+            placeholder="Create a strong password"
+            autocomplete="new-password"
+            required
+            minlength="6"
+          >
+          <span class="field-hint">Minimum 6 characters</span>
+        </div>
+
+        <div class="auth-field">
+          <label for="confirmPasswordInput">Confirm Password</label>
+          <input
+            class="field-control"
+            id="confirmPasswordInput"
+            type="password"
+            placeholder="Repeat your password"
+            autocomplete="new-password"
             required
             minlength="6"
           >
         </div>
 
         <button class="auth-submit-btn" type="submit" id="submitBtn">
-          <span class="btn-label">Sign In</span>
+          <span class="btn-label">Create Account</span>
           <span class="auth-spinner"></span>
         </button>
       </form>
 
       <!-- Footer -->
       <p class="auth-link">
-        Don't have an account? <a href="signup.html">Sign up</a>
+        Already have an account? <a href="login.html">Log in</a>
       </p>
     </article>
   </div>
@@ -319,23 +361,34 @@
           return;
         }
       } catch (e) {
-        console.warn("[Login] Auth check failed:", e);
+        console.warn("[Signup] Auth check failed:", e);
       }
 
-      // ── Form submission ─────────────────────────────────────────────
-      const form     = document.getElementById("loginForm");
-      const emailEl  = document.getElementById("emailInput");
-      const passEl   = document.getElementById("passwordInput");
-      const btn      = document.getElementById("submitBtn");
-      const errorEl  = document.getElementById("authError");
+      // ── Elements ────────────────────────────────────────────────────
+      const form       = document.getElementById("signupForm");
+      const bizNameEl  = document.getElementById("businessNameInput");
+      const emailEl    = document.getElementById("emailInput");
+      const passEl     = document.getElementById("passwordInput");
+      const confirmEl  = document.getElementById("confirmPasswordInput");
+      const btn        = document.getElementById("submitBtn");
+      const errorEl    = document.getElementById("authError");
+      const successEl  = document.getElementById("authSuccess");
 
       function showError(msg) {
+        successEl.classList.remove("is-visible");
         errorEl.textContent = msg;
         errorEl.classList.add("is-visible");
       }
 
-      function hideError() {
+      function showSuccess(msg) {
         errorEl.classList.remove("is-visible");
+        successEl.textContent = msg;
+        successEl.classList.add("is-visible");
+      }
+
+      function hideMessages() {
+        errorEl.classList.remove("is-visible");
+        successEl.classList.remove("is-visible");
       }
 
       function setLoading(loading) {
@@ -343,57 +396,118 @@
         btn.classList.toggle("is-loading", loading);
       }
 
+      /**
+       * Generate a prefix from the business name:
+       * Take the first 3 alphabetic characters, uppercase.
+       * Falls back to "BIZ" if the name doesn't have enough letters.
+       */
+      function generatePrefix(name) {
+        const letters = name.replace(/[^a-zA-Z]/g, "");
+        if (letters.length >= 3) return letters.substring(0, 3).toUpperCase();
+        if (letters.length > 0) return letters.toUpperCase().padEnd(3, "X");
+        return "BIZ";
+      }
+
+      // ── Form submit ────────────────────────────────────────────────
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        hideError();
+        hideMessages();
 
-        const email    = emailEl.value.trim();
-        const password = passEl.value;
+        const businessName = bizNameEl.value.trim();
+        const email        = emailEl.value.trim();
+        const password     = passEl.value;
+        const confirm      = confirmEl.value;
 
-        if (!email || !password) {
-          showError("Please enter both email and password.");
+        // ── Client-side validation ──────────────────────────────────
+        if (!businessName) {
+          showError("Please enter your business name.");
+          bizNameEl.focus();
+          return;
+        }
+
+        if (!email) {
+          showError("Please enter your email address.");
+          emailEl.focus();
+          return;
+        }
+
+        if (password.length < 6) {
+          showError("Password must be at least 6 characters long.");
+          passEl.focus();
+          return;
+        }
+
+        if (password !== confirm) {
+          showError("Passwords do not match. Please re-enter.");
+          confirmEl.focus();
           return;
         }
 
         setLoading(true);
 
         try {
-          const { data, error } = await WLAuth.signIn(email, password);
+          // ── 1. Create Supabase user ─────────────────────────────
+          const { data, error } = await WLAuth.signUp(email, password);
 
           if (error) {
-            let message = error.message || "Sign-in failed. Please try again.";
-            if (message.includes("Invalid login credentials")) {
-              message = "Invalid email or password. Please check your credentials and try again.";
-            } else if (message.includes("Email not confirmed")) {
-              message = "Your email has not been confirmed yet. Please check your inbox for a verification link.";
-            }
-            showError(message);
+            showError(error.message || "Sign-up failed. Please try again.");
             setLoading(false);
             return;
           }
 
-          // Store user for backward compat with existing app logic
           const user = data.user;
+
+          // If email confirmation is required, Supabase returns user but no session
+          if (!data.session) {
+            showSuccess(
+              "Account created! Please check your email for a verification link, then come back and log in."
+            );
+            setLoading(false);
+            // Disable form so they don't re-submit
+            form.querySelectorAll("input, button").forEach((el) => (el.disabled = true));
+            return;
+          }
+
+          // ── 2. Insert business into Supabase `businesses` table ─
+          const prefix = generatePrefix(businessName);
+          const sbClient = WLAuth.getClient();
+
+          try {
+            await sbClient.from("businesses").insert({
+              name: businessName,
+              user_id: user.id,
+              prefix: prefix,
+            });
+          } catch (sbErr) {
+            console.warn("[Signup] Supabase businesses insert warning:", sbErr);
+            // Non-fatal: continue with local setup even if remote insert fails
+          }
+
+          // ── 3. Create local business in IndexedDB ───────────────
+          try {
+            await window.WLDB.init();
+            await window.WLDB.createBusiness({
+              name: businessName,
+              prefix: prefix,
+            });
+          } catch (dbErr) {
+            console.warn("[Signup] Local DB setup warning:", dbErr);
+          }
+
+          // ── 4. Store user for backward compat ───────────────────
           localStorage.setItem("wl_user", JSON.stringify({
             id: user.id,
             email: user.email,
-            name: user.user_metadata?.full_name || user.email.split("@")[0],
+            name: user.user_metadata?.full_name || email.split("@")[0],
             picture: user.user_metadata?.avatar_url || "",
-            logged_at: Date.now()
+            logged_at: Date.now(),
           }));
 
-          // Initialize IndexedDB
-          try {
-            await window.WLDB.init();
-          } catch (dbErr) {
-            console.warn("[Login] WLDB init warning:", dbErr);
-          }
-
-          // Redirect
+          // ── 5. Redirect ─────────────────────────────────────────
           window.location.href = "index.html";
 
         } catch (err) {
-          console.error("[Login] Unexpected error:", err);
+          console.error("[Signup] Unexpected error:", err);
           showError("An unexpected error occurred. Please try again.");
           setLoading(false);
         }

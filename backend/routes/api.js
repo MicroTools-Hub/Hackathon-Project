@@ -414,7 +414,8 @@ export function transactionToEvent(transaction) {
     business_prefix: transaction.business_prefix,
     balance_before: transaction.balance_before,
     balance_after: transaction.balance_after,
-    due_date_at_transaction: transaction.due_date_at_transaction
+    due_date_at_transaction: transaction.due_date_at_transaction,
+    credit_days: transaction.credit_days
   };
 }
 

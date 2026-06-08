@@ -826,3 +826,218 @@ body.is-offline .offline-banner {
     bottom: 5rem;
   }
 }
+
+/* ── Sync Status Indicator ────────────────────────────── */
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: color 300ms ease, opacity 300ms ease;
+}
+
+.sync-indicator .sync-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+}
+
+.sync-indicator .sync-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.sync-indicator.is-syncing {
+  color: var(--amber);
+}
+
+.sync-indicator.is-syncing .sync-icon {
+  animation: sync-spin 1s linear infinite;
+}
+
+.sync-indicator.is-synced {
+  color: var(--green);
+}
+
+.sync-indicator.is-offline {
+  color: var(--muted-2);
+}
+
+.sync-indicator.is-error {
+  color: var(--red);
+}
+
+@keyframes sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Auth Page Styles ─────────────────────────────────── */
+.auth-container {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(212, 144, 10, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(74, 127, 165, 0.06) 0%, transparent 40%),
+    var(--bg);
+}
+
+.auth-card {
+  width: min(100%, 440px);
+  padding: clamp(2rem, 4vw, 3rem);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent), var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-logo {
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.auth-logo .logo-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(212, 144, 10, 0.75);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(212, 144, 10, 0.3), rgba(74, 127, 165, 0.12)), #111412;
+  color: var(--ink-strong);
+  font-family: var(--heading);
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.auth-logo .logo-text {
+  font-family: var(--heading);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ink-strong);
+  margin: 0;
+}
+
+.auth-logo .logo-desc {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.auth-field label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.auth-field input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 0.95rem;
+  transition: border-color 200ms ease;
+  outline: none;
+}
+
+.auth-field input:focus {
+  border-color: var(--amber);
+}
+
+.auth-field input::placeholder {
+  color: var(--muted-2);
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--amber);
+  color: #0d0f0e;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: var(--body);
+  cursor: pointer;
+  transition: background 160ms ease, opacity 160ms ease;
+}
+
+.auth-submit:hover {
+  background: #e5a01b;
+}
+
+.auth-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(13, 15, 14, 0.3);
+  border-top-color: #0d0f0e;
+  border-radius: 50%;
+  animation: sync-spin 0.6s linear infinite;
+}
+
+.auth-error {
+  padding: 0.65rem 0.85rem;
+  background: var(--red-soft);
+  border: 1px solid rgba(192, 57, 43, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--red);
+  font-size: 0.84rem;
+  display: none;
+}
+
+.auth-error.visible {
+  display: block;
+}
+
+.auth-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.auth-footer a {
+  color: var(--amber);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
