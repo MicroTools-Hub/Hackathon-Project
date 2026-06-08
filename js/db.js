@@ -194,11 +194,23 @@
     return dbPromise;
   }
 
-  function runAuthCheck(activeBusiness) {
+  async function runAuthCheck(activeBusiness) {
     const currentPath = window.location.pathname;
     const isLoginPage = currentPath.endsWith("login.html") || currentPath.endsWith("signup.html") || currentPath.endsWith("sso-mock.html");
     const isOnboardingPage = currentPath.endsWith("onboarding.html");
-    const user = localStorage.getItem("wl_user");
+    let user = localStorage.getItem("wl_user");
+
+    if (user && window.WLAuth) {
+      try {
+        const authed = await window.WLAuth.isAuthenticated();
+        if (!authed) {
+          localStorage.removeItem("wl_user");
+          user = null;
+        }
+      } catch (e) {
+        console.warn("[AuthCheck] Supabase session check failed:", e);
+      }
+    }
 
     if (!user) {
       if (!isLoginPage) {
@@ -225,7 +237,7 @@
         if (!seedPromise) seedPromise = seedIfNeeded();
         await seedPromise;
         const activeBusiness = await getActiveBusiness();
-        runAuthCheck(activeBusiness);
+        await runAuthCheck(activeBusiness);
         if (activeBusiness && navigator.onLine) {
           pullSync().catch(console.error);
         }

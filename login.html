@@ -308,6 +308,7 @@
   <script src="js/vendor-idb.js"></script>
   <script src="js/supabase.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/notify.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
@@ -382,11 +383,14 @@
             logged_at: Date.now()
           }));
 
-          // Initialize IndexedDB
+          // Initialize IndexedDB and pull business data
           try {
             await window.WLDB.init();
+            if (window.WLSync) {
+              await window.WLSync.initialPull();
+            }
           } catch (dbErr) {
-            console.warn("[Login] WLDB init warning:", dbErr);
+            console.warn("[Login] WLDB init/sync warning:", dbErr);
           }
 
           // Redirect
