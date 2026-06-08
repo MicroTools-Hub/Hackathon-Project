@@ -73,7 +73,22 @@
     try {
       console.log("Starting pull sync...");
       const activeId = await getActiveBusinessId();
-      const businessData = await apiFetch("/api/business");
+      const activeBusiness = activeId ? (await (await openDatabase()).get("businesses", activeId)) : null;
+      let businessData = await apiFetch("/api/business");
+
+      if (activeBusiness && (!businessData.business || !businessData.business.name || !businessData.business.prefix || businessData.business.id !== activeId)) {
+        console.log("Backend business is empty or mismatched, pushing active business setup...");
+        try {
+          const updatedBiz = await apiFetch("/api/business", {
+            method: "PUT",
+            body: JSON.stringify(activeBusiness)
+          });
+          businessData = { business: updatedBiz };
+        } catch (err) {
+          console.warn("Failed to push active business setup to backend:", err);
+        }
+      }
+
       const clientsData = await apiFetch("/api/clients");
       const txData = await apiFetch("/api/transactions");
       if (!businessData || !clientsData || !txData) {
@@ -1005,13 +1020,6 @@
     await tx.done;
     await saveSettings({ active_business_id: null });
     localStorage.removeItem('wl_last_sync_time');
-    if (navigator.onLine) {
-      try {
-        await apiFetch("/api/reset", { method: "POST" });
-      } catch (error) {
-        console.warn("Failed to reset backend on local ledger data clear:", error);
-      }
-    }
   }
 
   async function queueSyncAction(type, payload) {
