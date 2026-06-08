@@ -42,7 +42,13 @@
     state.business = await window.WLDB.getActiveBusiness();
     state.summaries = await window.WLDB.computeClientSummaries();
     state.payments = await window.WLDB.getPayments();
-    state.pending = state.payments.filter((payment) => payment.status === "pending_review");
+    const pendingPayments = state.payments
+      .filter((p) => p.status === "pending_review")
+      .map(p => ({ ...p, type: "payment" }));
+    const pendingInvoices = (await window.WLDB.getPendingInvoices())
+      .map(i => ({ ...i, type: "goods" }));
+    state.pending = [...pendingPayments, ...pendingInvoices]
+      .sort((a, b) => Number(b.recorded_at || b.created_at || 0) - Number(a.recorded_at || a.created_at || 0));
     state.metrics = await window.WLDB.computeMetrics();
     renderMetrics();
     renderClientTable();
@@ -199,13 +205,21 @@
     }
     grid.innerHTML = state.pending.map((payment) => {
       const client = state.summaries.find((item) => item.client.id === payment.client_id)?.client;
+      const isPayment = payment.type === "payment";
+      const detailLabel = isPayment ? "Mode" : "Credit Days";
+      const detailValue = isPayment ? escape(payment.mode || "unknown") : (payment.credit_days != null ? payment.credit_days : "Not set");
+      const typeLabel = isPayment ? "Payment" : "Goods";
+      const typeColor = isPayment ? "#27ae60" : "#d4900a";
       return `
         <article class="review-card" data-payment-id="${payment.id}">
-          <p class="review-raw">${escape(payment.raw_input || "No raw message captured")}</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <p class="review-raw" style="margin: 0; flex: 1;">${escape(payment.raw_input || "No raw message captured")}</p>
+            <span style="font-size: 0.72rem; font-family: var(--mono); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm); background: ${typeColor}; color: #0d0f0e; font-weight: bold; margin-left: 0.5rem; text-transform: uppercase;">${typeLabel}</span>
+          </div>
           <div class="review-extracted">
             <span>Client <strong>${escape(client?.name || payment.client_name || "Unmatched")}</strong></span>
             <span>Amount <strong>${money(payment.amount)}</strong></span>
-            <span>Mode <strong>${escape(payment.mode)}</strong></span>
+            <span>${detailLabel} <strong>${detailValue}</strong></span>
             <span>Confidence <strong>${Math.round(Number(payment.confidence || 0) * 100)}%</strong></span>
           </div>
           <div class="review-actions">
@@ -250,20 +264,34 @@
       await openReviewModal(payment);
       return;
     }
-    await window.WLDB.confirmPayment(payment.id);
-    window.WLNotify.success("Payment confirmed", money(payment.amount));
+    if (payment.type === "goods") {
+      if (payment.credit_days == null || payment.credit_days === "") {
+        await openReviewModal(payment);
+        return;
+      }
+      await window.WLDB.confirmInvoice(payment.id);
+      window.WLNotify.success("Goods entry confirmed", money(payment.amount));
+    } else {
+      await window.WLDB.confirmPayment(payment.id);
+      window.WLNotify.success("Payment confirmed", money(payment.amount));
+    }
     await renderDashboard();
     flashClientRow(payment.client_id);
   }
 
   async function discardReviewPayment(payment) {
     try {
-      await window.WLDB.discardPayment(payment.id);
-      window.WLNotify.info("Payment discarded", money(payment.amount));
+      if (payment.type === "goods") {
+        await window.WLDB.discardInvoice(payment.id);
+        window.WLNotify.info("Goods entry discarded", money(payment.amount));
+      } else {
+        await window.WLDB.discardPayment(payment.id);
+        window.WLNotify.info("Payment discarded", money(payment.amount));
+      }
       await renderDashboard();
     } catch (error) {
-      console.error("Failed to discard payment:", error);
-      window.WLNotify.error("Failed to discard payment", error.message);
+      console.error("Failed to discard transaction:", error);
+      window.WLNotify.error("Failed to discard transaction", error.message);
     }
   }
 
@@ -365,7 +393,28 @@
 
   async function openReviewModal(payment) {
     state.editPaymentId = payment.id;
+    state.editPaymentType = payment.type;
     const modal = ensureReviewModal();
+    const isPayment = payment.type === "payment";
+
+    const modeField = modal.querySelector("[data-field-mode]");
+    const invoiceField = modal.querySelector("[data-field-invoice]");
+    const creditDaysField = modal.querySelector("[data-field-credit-days]");
+
+    if (isPayment) {
+      if (modeField) modeField.style.display = "";
+      if (invoiceField) invoiceField.style.display = "";
+      if (creditDaysField) creditDaysField.style.display = "none";
+      modal.querySelector(".modal-title").textContent = "Edit Review Payment";
+      modal.querySelector("[data-save-review-payment]").textContent = "Confirm Payment";
+    } else {
+      if (modeField) modeField.style.display = "none";
+      if (invoiceField) invoiceField.style.display = "none";
+      if (creditDaysField) creditDaysField.style.display = "";
+      modal.querySelector(".modal-title").textContent = "Edit Review Goods Entry";
+      modal.querySelector("[data-save-review-payment]").textContent = "Confirm Goods Entry";
+    }
+
     const clients = await window.WLDB.getClients();
     const clientSelect = modal.querySelector("[name='client_id']");
     if (clients.length) {
@@ -376,11 +425,19 @@
       clientSelect.value = "";
     }
     modal.querySelector("[name='amount']").value = payment.amount;
-    modal.querySelector("[name='mode']").value = payment.mode;
+
+    if (isPayment) {
+      modal.querySelector("[name='mode']").value = payment.mode || "unknown";
+      await populateInvoiceSelect(modal.querySelector("[name='invoice_id']"), clientSelect.value);
+      clientSelect.onchange = async () => populateInvoiceSelect(modal.querySelector("[name='invoice_id']"), clientSelect.value);
+    } else {
+      modal.querySelector("[name='credit_days']").value = payment.credit_days != null ? payment.credit_days : "";
+      clientSelect.onchange = null;
+    }
+
     modal.querySelector("[name='date']").value = new Date(payment.recorded_at || Date.now()).toISOString().slice(0, 10);
     modal.querySelector("[name='raw_input']").value = payment.raw_input || "";
-    await populateInvoiceSelect(modal.querySelector("[name='invoice_id']"), clientSelect.value);
-    clientSelect.onchange = async () => populateInvoiceSelect(modal.querySelector("[name='invoice_id']"), clientSelect.value);
+    
     window.WLUI.openModal(modal);
   }
 
@@ -409,7 +466,7 @@
               <label>Amount</label>
               <input class="field-control" name="amount" type="number" min="1" step="1" required>
             </div>
-            <div class="field">
+            <div class="field" data-field-mode>
               <label>Mode</label>
               <select class="field-control" name="mode">
                 <option value="upi">UPI</option>
@@ -420,13 +477,17 @@
                 <option value="unknown">Unknown</option>
               </select>
             </div>
+            <div class="field" data-field-credit-days style="display: none;">
+              <label>Credit Period (Days)</label>
+              <input class="field-control" name="credit_days" type="number" min="1" step="1" placeholder="e.g. 30">
+            </div>
           </div>
           <div class="field-row">
             <div class="field">
               <label>Date</label>
               <input class="field-control" name="date" type="date" required>
             </div>
-            <div class="field">
+            <div class="field" data-field-invoice>
               <label>Invoice</label>
               <select class="field-control" name="invoice_id"></select>
             </div>
@@ -451,19 +512,34 @@
     const form = modal.querySelector("form");
     if (!form.reportValidity()) return;
     const data = new FormData(form);
-    const payment = await window.WLDB.confirmPayment(state.editPaymentId, {
-      client_id: data.get("client_id"),
-      invoice_id: data.get("invoice_id") || null,
-      amount: data.get("amount"),
-      mode: data.get("mode"),
-      recorded_at: new Date(`${data.get("date")}T12:00:00`).getTime(),
-      raw_input: data.get("raw_input"),
-      confidence: 1
-    });
-    window.WLUI.closeModal(modal);
-    window.WLNotify.success("Payment confirmed", money(payment.amount));
+
+    let result;
+    if (state.editPaymentType === "goods") {
+      result = await window.WLDB.confirmInvoice(state.editPaymentId, {
+        client_id: data.get("client_id"),
+        amount: data.get("amount"),
+        credit_days: data.get("credit_days") ? Number(data.get("credit_days")) : null,
+        recorded_at: new Date(`${data.get("date")}T12:00:00`).getTime(),
+        raw_input: data.get("raw_input"),
+        confidence: 1
+      });
+      window.WLUI.closeModal(modal);
+      window.WLNotify.success("Goods entry confirmed", money(result.amount));
+    } else {
+      result = await window.WLDB.confirmPayment(state.editPaymentId, {
+        client_id: data.get("client_id"),
+        invoice_id: data.get("invoice_id") || null,
+        amount: data.get("amount"),
+        mode: data.get("mode"),
+        recorded_at: new Date(`${data.get("date")}T12:00:00`).getTime(),
+        raw_input: data.get("raw_input"),
+        confidence: 1
+      });
+      window.WLUI.closeModal(modal);
+      window.WLNotify.success("Payment confirmed", money(result.amount));
+    }
     await renderDashboard();
-    flashClientRow(payment.client_id);
+    flashClientRow(result.client_id);
   }
 
   function flashClientRow(clientId) {

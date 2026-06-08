@@ -7,6 +7,28 @@ const LEDGER_HINTS = /(paid|payment|received|bheja|mila|jama|transfer|upi|utr|ca
 
 export async function processTextMessage(text, context = {}) {
   const routed = routeMessageText(text);
+
+  const phoneUpdate = parsePhoneUpdateMessage(routed.cleanedText) || parsePhoneUpdateMessage(text);
+  if (phoneUpdate) {
+    const match = store.matchClient(phoneUpdate.clientName);
+    if (match.score > 0.6 && match.client) {
+      const updatedClient = store.updateClient(match.client.id, {
+        phone: phoneUpdate.phoneNumber
+      });
+      return {
+        client_updated: true,
+        client: updatedClient,
+        extraction: { is_entry: false }
+      };
+    } else {
+      return {
+        ignored: true,
+        reason: `client_not_found_for_phone_update (name: ${phoneUpdate.clientName})`,
+        text
+      };
+    }
+  }
+
   if (routed.overrideTarget != null) {
     const override = store.approveCreditLimitOverride(routed.overrideTarget, context.sourceNumber);
     if (!override.transaction) {
@@ -41,17 +63,38 @@ export async function processTextMessage(text, context = {}) {
 
   const match = extraction.client_name ? store.matchClient(extraction.client_name) : { client: null, score: 0 };
   let client = match.score > 0.8 ? match.client : null;
+  const hasNewKeyword = /^(?:@\s*new|new)\b/i.test(routed.cleanedText);
+
   if (!client && extraction.client_name) {
-    client = store.addClient({
-      name: extraction.client_name,
-      phone: ""
-    });
-    match.score = 1;
-    match.client = client;
+    if (hasNewKeyword) {
+      let cleanedClientName = extraction.client_name
+        .replace(/^@?\s*new\b/i, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const secondaryMatch = store.matchClient(cleanedClientName);
+      if (secondaryMatch.score > 0.8) {
+        client = secondaryMatch.client;
+        match.score = secondaryMatch.score;
+        match.client = client;
+      } else {
+        client = store.addClient({
+          name: cleanedClientName,
+          phone: ""
+        });
+        match.score = 1;
+        match.client = client;
+      }
+    }
   }
+
   const prefixBoost = routed.businessPrefix && client ? 0.18 : 0;
   const confidence = Math.min(1, (Number(extraction.confidence || 0) + prefixBoost) * (client ? 1 : 0.72));
-  const status = confidence >= 0.85 && client ? "confirmed" : "pending_review";
+  let status = confidence >= 0.85 && client ? "confirmed" : "pending_review";
+  if (extraction.transaction_type === "goods" && (extraction.credit_days == null || extraction.credit_days === "")) {
+    status = "pending_review";
+  }
+
   const base = {
     client_id: client?.id || null,
     client_name: client?.name || extraction.client_name || "Unmatched client",
@@ -105,4 +148,15 @@ export function routeMessageText(text) {
 
 export function processImageExtraction(extraction, context = {}) {
   return buildPaymentResult(extraction, context);
+}
+
+function parsePhoneUpdateMessage(text) {
+  const clean = String(text || "").trim();
+  const regex = /^(.*?)\s+\b(phone\s*number|phone|mobile\s*number|mobile|number)\b\s*(?::|=|\s)\s*(\+?[0-9\s-]{10,20})$/i;
+  const match = clean.match(regex);
+  if (!match) return null;
+  return {
+    clientName: match[1].trim(),
+    phoneNumber: match[3].replace(/[\s-]/g, "")
+  };
 }

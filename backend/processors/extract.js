@@ -119,10 +119,14 @@ function extractCreditDays(text) {
 }
 
 export function heuristicExtract(text, context = {}, reason = "heuristic") {
-  const amount = extractAmount(text);
-  const client = inferClientName(text);
-  const transactionType = inferTransactionType(text);
-  const isEntry = amount > 0 && Boolean(transactionType) && isLedgerLike(text);
+  let cleaned = String(text || "").trim();
+  if (/^@?\s*new\b/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^@?\s*new\b/i, "").trim();
+  }
+  const amount = extractAmount(cleaned);
+  const client = inferClientName(cleaned);
+  const transactionType = inferTransactionType(cleaned);
+  const isEntry = amount > 0 && Boolean(transactionType) && isLedgerLike(cleaned);
   return {
     is_entry: isEntry,
     transaction_type: isEntry ? transactionType : null,
@@ -130,12 +134,12 @@ export function heuristicExtract(text, context = {}, reason = "heuristic") {
     is_goods: isEntry && transactionType === "goods",
     client_name: client,
     amount: amount || null,
-    mode: transactionType === "payment" ? inferMode(text) : "unknown",
-    description: transactionType === "goods" ? inferDescription(text) : null,
+    mode: transactionType === "payment" ? inferMode(cleaned) : "unknown",
+    description: transactionType === "goods" ? inferDescription(cleaned) : null,
     recorded_at: null,
-    utr_number: findUtr(text),
-    business_prefix: extractPrefix(text),
-    credit_days: transactionType === "goods" ? extractCreditDays(text) : null,
+    utr_number: findUtr(cleaned),
+    business_prefix: extractPrefix(cleaned),
+    credit_days: transactionType === "goods" ? extractCreditDays(cleaned) : null,
     notes: reason,
     confidence: isEntry ? (client ? 0.72 : 0.58) : 0.2,
     reason

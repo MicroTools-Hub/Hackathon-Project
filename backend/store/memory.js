@@ -392,6 +392,19 @@ export const store = {
     return client;
   },
 
+  updateClient(id, patch) {
+    const client = clients.find((c) => c.id === id);
+    if (!client) return null;
+    if (patch.phone !== undefined) client.phone = normalizePhone(patch.phone);
+    if (patch.name !== undefined) client.name = String(patch.name).trim();
+    if (patch.credit_limit !== undefined) client.credit_limit = Number(patch.credit_limit);
+    if (patch.payment_cycle_days !== undefined) client.payment_cycle_days = Number(patch.payment_cycle_days);
+    rebuildAllLedgers();
+    saveDb();
+    return client;
+  },
+
+
   matchClient(clientName) {
     return bestClientMatch(clientName, clients);
   },

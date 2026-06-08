@@ -387,6 +387,19 @@
     return next;
   }
 
+  async function updateClientLocally(client) {
+    const db = await init();
+    const existing = await db.get("clients", client.id);
+    const merged = {
+      ...existing,
+      ...client,
+      synced: true,
+      updated_at: new Date().toISOString()
+    };
+    await db.put("clients", merged);
+    return merged;
+  }
+
   async function getInvoices(businessId) {
     const activeId = businessId || await getActiveBusinessId();
     return (await all("invoices")).filter((invoice) => invoice.business_id === activeId);
@@ -431,7 +444,7 @@
     const confirmed = payments.filter((payment) => payment.status === "confirmed");
     return clients.map((client) => {
       const clientInvoices = invoices
-        .filter((invoice) => invoice.client_id === client.id)
+        .filter((invoice) => invoice.client_id === client.id && invoice.status !== "pending_review")
         .map((invoice) => computeInvoice(invoice, confirmed))
         .sort((a, b) => Number(a.due_date) - Number(b.due_date));
       const clientPayments = confirmed.filter((payment) => payment.client_id === client.id);
@@ -668,6 +681,65 @@
     }
   }
 
+  async function confirmInvoice(id, patch = {}) {
+    const db = await init();
+    const current = await db.get("invoices", id);
+    if (!current) throw new Error("Invoice not found");
+    const next = {
+      ...current,
+      ...patch,
+      amount: Number(patch.amount ?? current.amount) || 0,
+      credit_days: patch.credit_days !== undefined ? patch.credit_days : current.credit_days,
+      confidence: Number(patch.confidence ?? current.confidence ?? 1),
+      status: "confirmed",
+      synced: false,
+      updated_at: new Date().toISOString()
+    };
+    const client = next.client_id ? await getClient(next.client_id) : null;
+    const cycleDays = Number(next.credit_days || client?.payment_cycle_days || 30);
+    next.due_date = Number(patch.due_date || next.due_date_at_transaction)
+      || Number(next.created_at || next.recorded_at) + cycleDays * DAY;
+      
+    await db.put("invoices", next);
+    await refreshInvoiceStatuses(next.business_id);
+    
+    if (navigator.onLine) {
+      try {
+        await apiFetch(`/api/transactions/${id}/confirm`, {
+          method: "PUT",
+          body: JSON.stringify(next)
+        });
+      } catch (error) {
+        console.warn("Failed to push confirm invoice to server, queuing:", error);
+        await queueSyncAction("transaction_confirmed", next);
+      }
+    } else {
+      await queueSyncAction("transaction_confirmed", next);
+    }
+    return next;
+  }
+
+  async function discardInvoice(id) {
+    const db = await init();
+    const current = await db.get("invoices", id);
+    await db.delete("invoices", id);
+    if (current) {
+      await refreshInvoiceStatuses(current.business_id);
+      if (navigator.onLine) {
+        try {
+          await apiFetch(`/api/transactions/${id}`, {
+            method: "DELETE"
+          });
+        } catch (error) {
+          console.warn("Failed to push discard invoice to server, queuing:", error);
+          await queueSyncAction("transaction_deleted", { transaction_id: id });
+        }
+      } else {
+        await queueSyncAction("transaction_deleted", { transaction_id: id });
+      }
+    }
+  }
+
   async function deletePaymentLocally(id) {
     if (!id) return;
     const db = await init();
@@ -697,10 +769,17 @@
     const confirmed = payments.filter((payment) => payment.status === "confirmed");
     const tx = db.transaction("invoices", "readwrite");
     invoices.forEach((invoice) => {
+      if (invoice.status === "pending_review") return;
       const computed = computeInvoice(invoice, confirmed);
       tx.store.put({ ...invoice, status: computed.status });
     });
     await tx.done;
+  }
+
+  async function getPendingInvoices(businessId) {
+    const activeId = businessId || await getActiveBusinessId();
+    return (await all("invoices"))
+      .filter((invoice) => invoice.business_id === activeId && invoice.status === "pending_review");
   }
 
   async function getPendingPayments() {
@@ -1100,7 +1179,9 @@
     getClient,
     addClient,
     updateClient,
+    updateClientLocally,
     getInvoices,
+    getPendingInvoices,
     getPayments,
     getPendingPayments,
     getBusinessData,
@@ -1113,6 +1194,8 @@
     updatePayment,
     confirmPayment,
     discardPayment,
+    confirmInvoice,
+    discardInvoice,
     deletePaymentLocally,
     deleteInvoiceLocally,
     saveBusinessSetup,

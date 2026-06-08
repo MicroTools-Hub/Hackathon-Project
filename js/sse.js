@@ -148,7 +148,18 @@
       safelyHandleDeletePayment(data);
     } else if (type === "transaction_deleted") {
       safelyHandleDeleteTransaction(data);
+    } else if (type === "client_updated") {
+      safelyHandleClientUpdated(data);
     }
+  }
+
+  function safelyHandleClientUpdated(data) {
+    window.WLDB.updateClientLocally(data)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent("wl:client-updated", { detail: data }));
+        window.dispatchEvent(new CustomEvent("wl:sync-completed"));
+      })
+      .catch(console.error);
   }
 
   function safelyHandleDeletePayment(data) {
@@ -269,16 +280,8 @@
     }
 
     const confidence = Number(data.confidence ?? 0);
-    const status = data.status || (confidence >= 0.85 && clientId ? "confirmed" : "pending_review");
+    const status = data.status || (confidence >= 0.85 && clientId && data.credit_days != null ? "confirmed" : "pending_review");
     const amount = window.WLDB.formatCurrency(Number(data.amount) || 0, (await window.WLDB.getSettings()).currency_symbol);
-
-    if (status !== "confirmed" || !clientId) {
-      window.WLNotify.warning("Goods entry needs review", `${amount} for ${data.client_name || "unknown client"}`);
-      window.dispatchEvent(new CustomEvent("wl:ledger-entry", {
-        detail: { transaction: data, client: matchedClient, status, reviewNeeded: true }
-      }));
-      return null;
-    }
 
     const invoice = await window.WLDB.addInvoice({
       ...data,
@@ -287,8 +290,16 @@
       client_id: clientId,
       client_name: data.client_name || matchedClient?.name || "",
       match_score: matchScore,
-      status: "confirmed"
+      status: status
     });
+
+    if (status !== "confirmed" || !clientId) {
+      window.WLNotify.warning("Goods entry needs review", `${amount} for ${data.client_name || "unknown client"}`);
+      window.dispatchEvent(new CustomEvent("wl:ledger-entry", {
+        detail: { type: "goods", transaction: data, invoice, client: matchedClient, status, reviewNeeded: true }
+      }));
+      return invoice;
+    }
 
     window.WLNotify.success("Goods recorded", `${amount} for ${matchedClient?.name || data.client_name}`);
     window.dispatchEvent(new CustomEvent("wl:ledger-entry", {

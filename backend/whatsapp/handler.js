@@ -152,7 +152,20 @@ async function handleSingleMessage(sock, message) {
         sseManager.creditAlert(result.override);
       }
 
-      if (result?.payment) {
+      if (result?.client_updated) {
+        sseManager.broadcast({ type: "client_updated", data: result.client });
+        const clientName = result.client.name;
+        const phone = result.client.phone;
+        const text = `Updated phone number for ${clientName} to ${phone} in WholesaleLedger.`;
+        if (sock && message.key.remoteJid) {
+          await sock.sendMessage(message.key.remoteJid, { text });
+        }
+        logger.info("WhatsApp client phone updated", {
+          sourceNumber,
+          clientName,
+          phone
+        });
+      } else if (result?.payment) {
         sseManager.payment(transactionToEvent(result.payment));
         maybeBroadcastRatingAlert(result.payment);
         await sendAck(message.key, ackPayload(result));

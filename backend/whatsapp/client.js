@@ -159,24 +159,31 @@ async function handleConnectionUpdate(update) {
   if (connection === "close") {
     const statusCode = lastDisconnect?.error?.output?.statusCode;
     const loggedOut = statusCode === DisconnectReason.loggedOut;
+    const wasQrPending = globalThis.wholesaleLedgerWhatsAppStatus?.qr_pending === true;
+    
     globalThis.wholesaleLedgerWhatsAppStatus = { connected: false, qr_pending: false, statusCode };
     logger.warn("WhatsApp connection closed", { statusCode, loggedOut });
     store.addConnectionEvent("closed", "WhatsApp connection closed", { statusCode });
     sseManager.connection({ status: "closed", message: "WhatsApp connection closed", statusCode });
     sseManager.whatsappStatus("disconnected");
-
-    if (!loggedOut && reconnectAttempts < MAX_RECONNECTS) {
-      reconnectAttempts += 1;
-      logger.info("Reconnecting WhatsApp", { attempt: reconnectAttempts, max: MAX_RECONNECTS });
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        if (getWhatsAppStatus().connected) {
-          logger.info("Skipping WhatsApp reconnect because socket is already connected");
-          return;
+ 
+    if (!loggedOut) {
+      const isQrTimeout = wasQrPending || statusCode === 408 || statusCode === 503;
+      if (isQrTimeout || reconnectAttempts < MAX_RECONNECTS) {
+        if (!isQrTimeout) {
+          reconnectAttempts += 1;
         }
-        startWhatsAppClient().catch((error) => logger.error("WhatsApp reconnect failed", { error: error.message }));
-      }, 5000);
+        logger.info("Reconnecting WhatsApp", { attempt: reconnectAttempts, max: MAX_RECONNECTS, isQrTimeout });
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (getWhatsAppStatus().connected) {
+            logger.info("Skipping WhatsApp reconnect because socket is already connected");
+            return;
+          }
+          startWhatsAppClient().catch((error) => logger.error("WhatsApp reconnect failed", { error: error.message }));
+        }, 5000);
+      }
     } else if (loggedOut) {
       logger.warn("WhatsApp logged out. Clearing session files and restarting WhatsApp client to generate new QR...");
       (async () => {
