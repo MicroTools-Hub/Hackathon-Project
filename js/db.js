@@ -72,6 +72,7 @@
     }
     try {
       console.log("Starting pull sync...");
+      const activeId = await getActiveBusinessId();
       const businessData = await apiFetch("/api/business");
       const clientsData = await apiFetch("/api/clients");
       const txData = await apiFetch("/api/transactions");
@@ -79,15 +80,16 @@
         console.warn("Pull sync fetched empty data, aborting");
         return;
       }
+      const mappedBusinessId = activeId || businessData.business.id || "";
       const db = await openDatabase();
       const tx = db.transaction(["businesses", "clients", "invoices", "payments"], "readwrite");
       const bStore = tx.objectStore("businesses");
       await bStore.clear();
-      await bStore.put({ ...businessData.business, synced: true, updated_at: new Date().toISOString() });
+      await bStore.put({ ...businessData.business, id: mappedBusinessId, synced: true, updated_at: new Date().toISOString() });
       const cStore = tx.objectStore("clients");
       await cStore.clear();
       for (const client of clientsData.clients) {
-        await cStore.put({ ...client, synced: true, updated_at: new Date().toISOString() });
+        await cStore.put({ ...client, business_id: mappedBusinessId, synced: true, updated_at: new Date().toISOString() });
       }
       const iStore = tx.objectStore("invoices");
       const pStore = tx.objectStore("payments");
@@ -97,7 +99,7 @@
         if (trans.type === "goods") {
           const invoice = {
             id: trans.transaction_id || trans.id,
-            business_id: trans.business_id || businessData.business.id,
+            business_id: mappedBusinessId,
             client_id: trans.client_id,
             amount: Number(trans.amount) || 0,
             due_date: Number(
@@ -120,7 +122,7 @@
         } else if (trans.type === "payment") {
           const payment = {
             id: trans.id,
-            business_id: trans.business_id || businessData.business.id,
+            business_id: mappedBusinessId,
             client_id: trans.client_id,
             invoice_id: trans.invoice_id || null,
             amount: Number(trans.amount) || 0,
@@ -141,7 +143,7 @@
         }
       }
       await tx.done;
-      await refreshInvoiceStatuses(businessData.business.id);
+      await refreshInvoiceStatuses(mappedBusinessId);
       console.log("Pull sync completed successfully!");
       window.dispatchEvent(new CustomEvent("wl:sync-completed"));
     } catch (error) {
@@ -389,10 +391,12 @@
 
   async function updateClientLocally(client) {
     const db = await init();
+    const activeId = await getActiveBusinessId();
     const existing = await db.get("clients", client.id);
     const merged = {
       ...existing,
       ...client,
+      business_id: client.business_id && client.business_id !== "" ? client.business_id : (activeId || ""),
       synced: true,
       updated_at: new Date().toISOString()
     };

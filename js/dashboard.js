@@ -415,11 +415,22 @@
       modal.querySelector("[data-save-review-payment]").textContent = "Confirm Goods Entry";
     }
 
-    const clients = await window.WLDB.getClients();
+    let clients = await window.WLDB.getClients();
+    
+    // Ensure the client for this transaction is in the clients list
+    const hasTransactionClient = clients.some(c => c.id === payment.client_id || (payment.client_name && c.name.toLowerCase() === payment.client_name.toLowerCase()));
+    
+    if (!hasTransactionClient && (payment.client_id || payment.client_name)) {
+      clients.push({
+        id: payment.client_id || `temp-${Date.now()}`,
+        name: payment.client_name || "Unknown Client"
+      });
+    }
+
     const clientSelect = modal.querySelector("[name='client_id']");
     if (clients.length) {
       clientSelect.innerHTML = clients.map((client) => `<option value="${client.id}">${escape(client.name)}</option>`).join("");
-      clientSelect.value = payment.client_id || clients[0]?.id || "";
+      clientSelect.value = payment.client_id || clients[clients.length - 1]?.id || "";
     } else {
       clientSelect.innerHTML = `<option value="">No clients found. Add a client first.</option>`;
       clientSelect.value = "";
