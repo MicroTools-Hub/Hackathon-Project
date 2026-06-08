@@ -63,7 +63,7 @@ export async function processTextMessage(text, context = {}) {
 
   const match = extraction.client_name ? store.matchClient(extraction.client_name) : { client: null, score: 0 };
   let client = match.score > 0.8 ? match.client : null;
-  const hasNewKeyword = /^(?:@\s*new|new)\b/i.test(routed.cleanedText);
+  const hasNewKeyword = /\bnew\b/i.test(routed.cleanedText) || /\bnew\b/i.test(text);
 
   if (!client && extraction.client_name) {
     if (hasNewKeyword) {
