@@ -27,66 +27,107 @@
     else setStatus("offline", "Offline");
   }
 
+  let activeController = null;
+
   function stop() {
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
+    if (activeController) {
+      activeController.abort();
+      activeController = null;
     }
     if (reconnectTimer) window.clearTimeout(reconnectTimer);
     if (simulatorTimer) window.clearTimeout(simulatorTimer);
   }
 
-  function connect(endpoint) {
+  async function connect(endpoint) {
     setStatus("offline", "Connecting");
-    try {
-      eventSource = new EventSource(endpoint);
-    } catch (error) {
-      scheduleReconnect(endpoint, error);
-      return;
-    }
+    if (activeController) activeController.abort();
+    activeController = new AbortController();
 
-    eventSource.onopen = async () => {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          "Accept": "text/event-stream",
+          "ngrok-skip-browser-warning": "69420"
+        },
+        signal: activeController.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`SSE status code ${response.status}`);
+      }
+
       retryDelay = 1000;
       setStatus("live", "Live");
       await window.WLDB.appendConnectionLog("SSE connection opened", "success");
       if (window.WLDB && window.WLDB.pullSync) {
         window.WLDB.pullSync().catch(console.error);
       }
-    };
 
-    eventSource.addEventListener("payment", (event) => {
-      safelyHandlePayment(parseEventData(event));
-    });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-    eventSource.addEventListener("transaction", (event) => {
-      safelyHandleTransaction(parseEventData(event));
-    });
+      let eventName = "message";
+      let eventData = "";
 
-    eventSource.onmessage = (event) => {
-      routeServerEvent(parseEventData(event));
-    };
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-    eventSource.addEventListener("reminder", async (event) => {
-      const payload = parseEventData(event);
-      window.WLNotify.info("Reminder sent", payload?.client_name || "WhatsApp delivery confirmed");
-      window.dispatchEvent(new CustomEvent("wl:reminder", { detail: payload }));
-    });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop(); // Keep partial line in buffer
 
-    eventSource.addEventListener("error", (event) => {
-      if (!event.data) return;
-      const payload = parseEventData(event);
-      window.WLNotify.error("Extraction failed", payload?.message || "AI extraction could not be completed");
-      window.dispatchEvent(new CustomEvent("wl:sse-error", { detail: payload }));
-    });
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            // Empty line indicates event completion
+            if (eventData) {
+              try {
+                const parsed = JSON.parse(eventData);
+                if (eventName === "payment") {
+                  safelyHandlePayment(parsed);
+                } else if (eventName === "transaction") {
+                  safelyHandleTransaction(parsed);
+                } else if (eventName === "reminder") {
+                  window.WLNotify.info("Reminder sent", parsed?.client_name || "WhatsApp delivery confirmed");
+                  window.dispatchEvent(new CustomEvent("wl:reminder", { detail: parsed }));
+                } else if (eventName === "error") {
+                  window.WLNotify.error("Extraction failed", parsed?.message || "AI extraction could not be completed");
+                  window.dispatchEvent(new CustomEvent("wl:sse-error", { detail: parsed }));
+                } else if (eventName === "message") {
+                  routeServerEvent(parsed);
+                }
+              } catch (e) {
+                console.error("Failed to parse event data:", eventData, e);
+              }
+              eventName = "message";
+              eventData = "";
+            }
+            continue;
+          }
 
-    eventSource.onerror = async (error) => {
-      if (eventSource) eventSource.close();
-      eventSource = null;
+          if (trimmed.startsWith("event:")) {
+            eventName = trimmed.slice(6).trim();
+          } else if (trimmed.startsWith("data:")) {
+            eventData += trimmed.slice(5).trim();
+          }
+        }
+      }
+
+      throw new Error("Stream closed");
+
+    } catch (error) {
+      if (error.name === "AbortError") {
+        console.log("SSE connection aborted intentionally.");
+        return;
+      }
+      console.error("SSE fetch error:", error);
       setStatus("offline", "Offline");
       window.WLNotify.error("Connection lost", "Working offline");
       await window.WLDB.appendConnectionLog("SSE connection dropped", "error");
-      scheduleReconnect(endpoint, error);
-    };
+      scheduleReconnect(endpoint);
+    }
   }
 
   function scheduleReconnect(endpoint) {
@@ -351,33 +392,28 @@
       await window.WLDB.appendConnectionLog("Simulator endpoint tested successfully", "success");
       return { ok: true, message: "Development simulator is available" };
     }
-    return new Promise((resolve) => {
-      let source;
-      const timer = window.setTimeout(async () => {
-        if (source) source.close();
-        await window.WLDB.appendConnectionLog("SSE test timed out", "error");
-        resolve({ ok: false, message: "Connection timed out" });
-      }, 5000);
-      try {
-        source = new EventSource(endpoint);
-      } catch (error) {
-        window.clearTimeout(timer);
-        resolve({ ok: false, message: error.message });
-        return;
-      }
-      source.onopen = async () => {
-        window.clearTimeout(timer);
-        source.close();
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(endpoint, {
+        headers: {
+          "Accept": "text/event-stream",
+          "ngrok-skip-browser-warning": "69420"
+        },
+        signal: controller.signal
+      });
+      window.clearTimeout(timer);
+      if (res.ok) {
         await window.WLDB.appendConnectionLog("SSE test connection succeeded", "success");
-        resolve({ ok: true, message: "Connection opened" });
-      };
-      source.onerror = async () => {
-        window.clearTimeout(timer);
-        source.close();
+        return { ok: true, message: "Connection opened" };
+      } else {
         await window.WLDB.appendConnectionLog("SSE test connection failed", "error");
-        resolve({ ok: false, message: "Connection failed" });
-      };
-    });
+        return { ok: false, message: `Status code ${res.status}` };
+      }
+    } catch (error) {
+      await window.WLDB.appendConnectionLog("SSE test connection failed", "error");
+      return { ok: false, message: error.message };
+    }
   }
 
   function setStatus(status, label) {
