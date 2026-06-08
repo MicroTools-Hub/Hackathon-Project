@@ -91,8 +91,19 @@ export async function processTextMessage(text, context = {}) {
   const prefixBoost = routed.businessPrefix && client ? 0.18 : 0;
   const confidence = Math.min(1, (Number(extraction.confidence || 0) + prefixBoost) * (client ? 1 : 0.72));
   let status = confidence >= 0.85 && client ? "confirmed" : "pending_review";
+  let review_reason = null;
+
+  if (status === "pending_review") {
+    if (!client) {
+      review_reason = "client not registered";
+    } else if (confidence < 0.85) {
+      review_reason = `low extraction confidence (${Math.round(confidence * 100)}%)`;
+    }
+  }
+
   if (extraction.transaction_type === "goods" && (extraction.credit_days == null || extraction.credit_days === "")) {
     status = "pending_review";
+    review_reason = "credit period (days) not specified";
   }
 
   const base = {
@@ -105,6 +116,7 @@ export async function processTextMessage(text, context = {}) {
     raw_input: text,
     confidence,
     status,
+    review_reason,
     business_prefix: extraction.business_prefix || routed.businessPrefix || store.getBusiness().prefix,
     match_score: match.score
   };

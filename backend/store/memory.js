@@ -198,6 +198,7 @@ function createTransaction(data) {
     raw_input: data.raw_input || "",
     confidence: Number(data.confidence ?? 1),
     status: data.status || "pending_review",
+    review_reason: data.review_reason || null,
     business_prefix: data.business_prefix || business.prefix,
     match_score: Number(data.match_score || 0),
     applied_to_balance: false,

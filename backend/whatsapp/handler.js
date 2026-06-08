@@ -262,7 +262,9 @@ function ackPayload(result) {
     client_name: transaction.client_name,
     amount: transaction.amount,
     mode: transaction.mode,
-    confidence: transaction.confidence
+    confidence: transaction.confidence,
+    status: transaction.status,
+    review_reason: transaction.review_reason
   };
 }
 

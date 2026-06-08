@@ -49,10 +49,11 @@ export async function sendAck(key, extractionResult = {}) {
   const amount = extractionResult.amount ? formatINR(extractionResult.amount) : "payment";
   const isGoods = extractionResult.is_goods || extractionResult.transaction_type === "goods";
   const mode = !isGoods && extractionResult.mode ? ` by ${String(extractionResult.mode).toUpperCase()}` : "";
-  const confidence = Number(extractionResult.confidence || 0);
-  const reviewLine = confidence >= 0.85
+  const status = extractionResult.status || "confirmed";
+  const reason = extractionResult.review_reason || "unknown reason";
+  const reviewLine = status === "confirmed"
     ? "Entry confirmed in WholesaleLedger."
-    : "Entry saved for review in WholesaleLedger.";
+    : `Entry is pending for review because - ${reason}.`;
   const text = isGoods
     ? `Recorded goods: ${amount} for ${clientName}.\n${reviewLine}`
     : `Received: ${amount}${mode} from ${clientName}.\n${reviewLine}`;

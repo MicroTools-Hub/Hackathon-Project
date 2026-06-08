@@ -25,6 +25,7 @@ async function runTests() {
   assert.strictEqual(res1.transaction.status, "pending_review", "Status must be pending_review");
   assert.strictEqual(res1.transaction.client_id, null, "client_id must be null");
   assert.strictEqual(res1.transaction.client_name, "amit stores", "Client name should match extracted name");
+  assert.strictEqual(res1.transaction.review_reason, "client not registered", "Review reason must be 'client not registered'");
   const clientsBefore = store.listClients();
   assert.ok(!clientsBefore.some(c => c.name.toLowerCase().includes("amit stores")), "Should not have created client 'amit stores'");
   console.log("✓ Test 1 Passed!");
@@ -39,6 +40,7 @@ async function runTests() {
   
   // Note: credit_days is missing, so status is pending_review
   assert.strictEqual(res2.transaction.status, "pending_review", "Status must be pending_review due to missing credit days");
+  assert.strictEqual(res2.transaction.review_reason, "credit period (days) not specified", "Review reason must be correct");
   assert.ok(res2.transaction.client_id !== null, "client_id must be assigned");
   
   const createdClient = store.getClient(res2.transaction.client_id);
@@ -71,6 +73,7 @@ async function runTests() {
   });
   
   assert.strictEqual(res4.transaction.status, "pending_review", "Status must be pending_review due to missing credit days");
+  assert.strictEqual(res4.transaction.review_reason, "credit period (days) not specified", "Review reason must be correct");
   assert.strictEqual(res4.transaction.client_id, res2.transaction.client_id, "Should match existing client ID");
   console.log("✓ Test 4 Passed!");
   
