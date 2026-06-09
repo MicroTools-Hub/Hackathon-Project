@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "latest",
+    "@supabase/supabase-js": "^2.108.0",
     "@whiskeysockets/baileys": "latest",
     "cors": "latest",
     "dotenv": "latest",
@@ -27,6 +28,5 @@
     "qrcode-terminal": "latest",
     "sharp": "latest",
     "uuid": "latest"
-  },
-  "devDependencies": {}
+  }
 }

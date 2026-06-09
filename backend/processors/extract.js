@@ -147,20 +147,36 @@ export function heuristicExtract(text, context = {}, reason = "heuristic") {
 }
 
 export function parseJson(text) {
-  const cleaned = String(text || "")
-    .trim()
+  const raw = String(text || "").trim();
+  const cleanedOriginal = raw
     .replace(/^```json/i, "")
     .replace(/^```/i, "")
     .replace(/```$/i, "")
     .trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleanedOriginal);
+  } catch (e) {
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      const sliced = raw.slice(start, end + 1);
+      try {
+        return JSON.parse(sliced);
+      } catch (innerErr) {
+        throw e;
+      }
+    }
+    throw e;
+  }
 }
+
 
 export async function callGeminiForJson(model, contents, retryContents) {
   const first = await runGeminiTask(() => model.generateContent(contents));
   try {
     return parseJson(first.response.text());
   } catch (error) {
+    console.log("Raw Gemini Text:", JSON.stringify(first.response.text()));
     logger.warn("Gemini returned invalid JSON; retrying once", { error: error.message });
   }
 

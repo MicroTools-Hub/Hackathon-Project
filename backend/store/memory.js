@@ -3,6 +3,12 @@ import { config } from "../config.js";
 import { formatINR, normalizePhone } from "../utils/format.js";
 import { bestClientMatch } from "../utils/fuzzy.js";
 import { ensureRating, recalculateRating } from "../utils/rating.js";
+import {
+  fetchTrustedNumbersFromSupabase,
+  upsertTrustedNumberInSupabase,
+  deleteTrustedNumberFromSupabase,
+  patchTrustedNumberInSupabase
+} from "../utils/supabase.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -176,6 +182,70 @@ async function loadDb() {
 }
 
 await loadDb();
+
+/**
+ * Replace the in-memory trusted number cache with fresh data from Supabase.
+ * If Supabase is unreachable or the table is empty AND the local db has
+ * numbers already, the existing cache is kept unchanged.
+ * Returns true if the cache was updated, false otherwise.
+ */
+async function refreshTrustedNumbersCache() {
+  const rows = await fetchTrustedNumbersFromSupabase(business?.id);
+  if (!rows) return false; // Supabase error — keep existing cache
+
+  if (rows.length === 0) {
+    // Table is empty for this business — seed it from the .env fallback if we have numbers
+    const fallback = config.trustedNumbers.map(normalizePhone).filter(Boolean);
+    if (fallback.length > 0) {
+      console.info("[memory] Supabase trusted_numbers table is empty for this business. Seeding from TRUSTED_NUMBERS env.");
+      for (const phone of fallback) {
+        await upsertTrustedNumberInSupabase(business.id, {
+          phone,
+          label: phone === normalizePhone(config.ownerNumber) ? "Owner" : "Staff",
+          active: true
+        });
+      }
+      // Re-fetch after seeding
+      const seeded = await fetchTrustedNumbersFromSupabase(business.id);
+      if (seeded && seeded.length > 0) {
+        applyTrustedRowsToStore(seeded);
+        return true;
+      }
+    }
+    // Nothing to seed — keep existing in-memory data
+    return false;
+  }
+
+  applyTrustedRowsToStore(rows);
+  return true;
+}
+
+function applyTrustedRowsToStore(rows) {
+  business.trusted_numbers = rows.map((r) => r.phone).filter(Boolean);
+  business.trusted_number_meta = rows.map((r) => ({
+    phone: r.phone,
+    label: r.label || "Staff",
+    active: r.active !== false,
+    last_message_at: r.last_message_at ? new Date(r.last_message_at).getTime() : null,
+    created_at: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+  }));
+}
+
+// Kick off the initial Supabase sync (non-blocking — db is already loaded from disk)
+refreshTrustedNumbersCache().then((updated) => {
+  if (updated) {
+    console.info("[memory] Trusted numbers cache loaded from Supabase.");
+  } else {
+    console.info("[memory] Keeping trusted numbers from local db (Supabase unavailable or table empty).");
+  }
+}).catch((err) => console.error("[memory] Initial Supabase trusted numbers sync failed", err));
+
+// Background poll: keep the in-memory cache fresh every 60 s
+setInterval(() => {
+  refreshTrustedNumbersCache().catch((err) =>
+    console.error("[memory] Supabase trusted numbers poll failed", err)
+  );
+}, 60_000).unref();
 
 function createTransaction(data) {
   const client = data.client_id ? clients.find((item) => item.id === data.client_id) : null;
@@ -458,6 +528,10 @@ export const store = {
       }
     });
     saveDb();
+    // Sync to Supabase: upsert all
+    Promise.all(
+      normalizedList.map((num) => upsertTrustedNumberInSupabase(business.id, { phone: num, active: true }))
+    ).catch((err) => console.error("[memory] Supabase setTrustedNumbers sync failed", err));
     return business.trusted_numbers;
   },
 
@@ -480,6 +554,9 @@ export const store = {
         });
       }
       saveDb();
+      // Sync to Supabase
+      upsertTrustedNumberInSupabase(business.id, { phone: normalized, label: label || "Staff", active: true })
+        .catch((err) => console.error("[memory] Supabase addTrustedNumber sync failed", err));
     }
     return business.trusted_numbers;
   },
@@ -491,6 +568,9 @@ export const store = {
       business.trusted_number_meta = business.trusted_number_meta.filter((item) => item.phone !== normalized);
     }
     saveDb();
+    // Sync to Supabase
+    deleteTrustedNumberFromSupabase(business.id, normalized)
+      .catch((err) => console.error("[memory] Supabase removeTrustedNumber sync failed", err));
     return business.trusted_numbers;
   },
 
@@ -503,6 +583,9 @@ export const store = {
         saveDb();
       }
     }
+    // Fire-and-forget: update last_message_at in Supabase
+    patchTrustedNumberInSupabase(business.id, normalized, { last_message_at: new Date().toISOString() })
+      .catch((err) => console.error("[memory] Supabase touchTrustedNumber sync failed", err));
   },
 
   toggleTrustedNumber(phone, active) {
@@ -513,6 +596,9 @@ export const store = {
       );
       saveDb();
     }
+    // Sync to Supabase
+    patchTrustedNumberInSupabase(business.id, normalized, { active: !!active })
+      .catch((err) => console.error("[memory] Supabase toggleTrustedNumber sync failed", err));
     return business.trusted_numbers;
   },
 
@@ -764,5 +850,10 @@ export const store = {
     transactions = [];
     creditLimitAlerts = [];
     saveDb();
+  },
+
+  /** Public wrapper so handler.js (and any other module) can trigger a cache refresh. */
+  async refreshTrustedNumbersFromSupabase() {
+    return refreshTrustedNumbersCache();
   }
 };

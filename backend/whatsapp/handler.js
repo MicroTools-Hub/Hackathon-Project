@@ -9,6 +9,7 @@ import { transcribeBuffer } from "../processors/transcribe.js";
 import { extractPaymentFromImageBuffer, buildPaymentResult } from "../processors/ocr.js";
 import { jidToPhone } from "../utils/format.js";
 import { logger } from "../utils/logger.js";
+import { checkTrustedNumberInSupabase } from "../utils/supabase.js";
 import { sendAck, sendOwnerAlert } from "./sender.js";
 import { resolveLidToPhone } from "./client.js";
 
@@ -62,14 +63,26 @@ async function handleSingleMessage(sock, message) {
     }
   }
 
-  const sourceNumber = message.key?.fromMe
-    ? (sock.user?.id ? jidToPhone(sock.user.id) : "")
-    : jidToPhone(senderJid);
+  const sourceJid = message.key?.fromMe
+    ? (sock.user?.id || "")
+    : senderJid;
+  let resolvedSourceJid = sourceJid;
+  if (isLidUser(sourceJid)) {
+    const resolved = resolveLidToPhone(sourceJid);
+    if (resolved) {
+      resolvedSourceJid = resolved + "@s.whatsapp.net";
+    }
+  }
+  const sourceNumber = jidToPhone(resolvedSourceJid);
 
   if (message.key?.fromMe) {
-    const myJid = sock.user?.id ? sock.user.id.split("@")[0].split(":")[0] : "";
+    const myJidDigits = sock.user?.id ? sock.user.id.split("@")[0].split(":")[0] : "";
     const remoteJidDigits = remoteJid.split("@")[0].split(":")[0];
-    const isSelfChat = myJid && remoteJidDigits && myJid === remoteJidDigits;
+    
+    const myPhone = sock.user?.id && isLidUser(sock.user.id) ? (resolveLidToPhone(sock.user.id) || myJidDigits) : myJidDigits;
+    const remotePhone = isLidUser(remoteJid) ? (resolveLidToPhone(remoteJid) || remoteJidDigits) : remoteJidDigits;
+    
+    const isSelfChat = myPhone && remotePhone && myPhone === remotePhone;
     
     const content = unwrapMessage(message.message);
     const text = content.conversation || content.extendedTextMessage?.text || content.imageMessage?.caption || content.documentMessage?.caption || "";
@@ -86,12 +99,21 @@ async function handleSingleMessage(sock, message) {
     }
   }
 
+
   if (!store.isTrustedNumber(sourceNumber)) {
-    logger.info("Ignoring WhatsApp message from untrusted number", {
-      sourceNumber,
-      trustedNumbers: store.listTrustedNumbers()
-    });
-    return;
+    // Cache miss — do a live Supabase re-check scoped to this business
+    const businessId = store.getBusiness()?.id;
+    const liveCheck = await checkTrustedNumberInSupabase(businessId, sourceNumber);
+    if (!liveCheck) {
+      logger.info("Ignoring WhatsApp message from untrusted number", {
+        sourceNumber,
+        trustedNumbers: store.listTrustedNumbers()
+      });
+      return;
+    }
+    // Supabase confirms this number is trusted; refresh cache and proceed
+    logger.info("Supabase live-check passed for number not yet in cache — refreshing cache", { sourceNumber });
+    await store.refreshTrustedNumbersFromSupabase();
   }
 
   await queue.add(async () => {

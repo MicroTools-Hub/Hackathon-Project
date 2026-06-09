@@ -57,5 +57,9 @@ export const config = {
     concurrency: Number(process.env.PROCESSING_CONCURRENCY || 1),
     intervalCap: Number(process.env.PROCESSING_INTERVAL_CAP || 12),
     interval: Number(process.env.PROCESSING_INTERVAL_MS || 60000)
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL || "",
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || ""
   }
 };

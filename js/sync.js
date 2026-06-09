@@ -12,6 +12,14 @@
   const DB_VERSION   = 1;
   const SYNC_TABLES  = ['businesses', 'clients', 'invoices', 'payments'];
 
+  const ALLOWED_FIELDS = {
+    businesses: ['id', 'name', 'prefix', 'owner_number', 'trusted_numbers', 'trusted_number_meta', 'created_at'],
+    clients: ['id', 'business_id', 'name', 'phone', 'credit_limit', 'payment_cycle_days', 'created_at'],
+    invoices: ['id', 'business_id', 'client_id', 'amount', 'due_date', 'status', 'notes', 'source', 'source_number', 'raw_input', 'confidence', 'transaction_id', 'business_prefix', 'client_name', 'created_at'],
+    payments: ['id', 'business_id', 'client_id', 'invoice_id', 'amount', 'mode', 'recorded_at', 'source', 'source_number', 'raw_input', 'confidence', 'status', 'utr_number', 'notes', 'business_prefix', 'client_name', 'match_score', 'created_at']
+  };
+
+
   // ── State ─────────────────────────────────────────────
   let pushTimer  = null;
   let pullTimer  = null;
@@ -124,6 +132,38 @@
       return;
     }
 
+    // Self-healing check: If the active business doesn't exist in Supabase (e.g. database reset),
+    // mark all local records as unsynced so they get re-pushed.
+    const activeBusiness = window.WLDB ? await window.WLDB.getActiveBusiness() : null;
+    const activeBusinessId = activeBusiness?.id || null;
+    if (activeBusinessId) {
+      try {
+        const { data, error } = await sb
+          .from('businesses')
+          .select('id')
+          .eq('id', activeBusinessId)
+          .maybeSingle();
+
+        if (!error && !data) {
+          console.log('[Sync] Active business not found in Supabase (database reset?), force-marking local data as unsynced for re-push...');
+          for (const table of SYNC_TABLES) {
+            const tx = db.transaction(table, 'readwrite');
+            const allRecords = await tx.store.getAll();
+            for (const record of allRecords) {
+              if (record.synced !== false) {
+                await tx.store.put({ ...record, synced: false });
+              }
+            }
+            await tx.done;
+          }
+          console.log('[Sync] All local records marked as unsynced successfully.');
+        }
+      } catch (err) {
+        console.warn('[Sync] Failed to verify active business existence in Supabase:', err);
+      }
+    }
+
+
     for (const table of SYNC_TABLES) {
       let all;
       try {
@@ -136,12 +176,16 @@
       const unsynced = all.filter(r => r.synced === false);
       if (unsynced.length === 0) continue;
 
-      // Prepare records for Supabase upsert
+      // Prepare records for Supabase upsert (filter to only include allowed schema fields)
       const records = unsynced.map(r => {
-        const clean = { ...r, user_id: userId };
-
-        // Remove local-only fields
-        delete clean.synced;
+        const clean = {};
+        const allowed = ALLOWED_FIELDS[table];
+        for (const field of allowed) {
+          if (r[field] !== undefined) {
+            clean[field] = r[field];
+          }
+        }
+        clean.user_id = userId;
 
         // Convert created_at to ISO if stored as epoch number
         if (typeof clean.created_at === 'number') {
@@ -153,6 +197,7 @@
 
         return clean;
       });
+
 
       try {
         const { error } = await sb.from(table).upsert(records, { onConflict: 'id' });
@@ -221,8 +266,9 @@
           const localTime = local?.updated_at ? new Date(local.updated_at).getTime() : 0;
 
           if (!local || cloudTime > localTime) {
-            // Cloud is newer or record doesn't exist locally — overwrite
+            // Cloud is newer or record doesn't exist locally — merge/overwrite
             const merged = {
+              ...local,
               ...cloudRecord,
               synced: true,
               // Keep created_at as epoch number for IndexedDB compat
@@ -233,6 +279,7 @@
             await tx.store.put(merged);
             totalPulled++;
           }
+
           // If local is newer, skip — next push cycle will handle it
         }
         await tx.done;
@@ -307,7 +354,9 @@
 
         const tx = db.transaction(table, 'readwrite');
         for (const record of data) {
+          const local = await tx.store.get(record.id);
           const merged = {
+            ...local,
             ...record,
             synced: true,
             created_at: toEpoch(record.created_at),
@@ -316,6 +365,7 @@
           await tx.store.put(merged);
         }
         await tx.done;
+
         totalRecords += data.length;
       } catch (err) {
         console.error(`[Sync] initialPull network error for "${table}":`, err);
