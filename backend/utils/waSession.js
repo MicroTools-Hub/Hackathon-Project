@@ -124,3 +124,23 @@ export async function hasSavedSession(sessionDir) {
     }
   }
 }
+
+export async function clearSavedSession(sessionDir) {
+  if (supabase) {
+    try {
+      logger.info("Clearing WhatsApp session from Supabase wa_sessions...");
+      const { error } = await supabase.from("wa_sessions").delete().neq("key", "keep_nothing");
+      if (error) throw error;
+      logger.info("WhatsApp session cleared from Supabase wa_sessions successfully.");
+    } catch (err) {
+      logger.error("Failed to clear WhatsApp session in Supabase:", { error: err.message });
+    }
+  }
+  
+  try {
+    logger.info(`Clearing local session directory: ${sessionDir}`);
+    await fs.rm(sessionDir, { recursive: true, force: true });
+  } catch (err) {
+    logger.warn("Failed to clear local session directory:", { error: err.message });
+  }
+}

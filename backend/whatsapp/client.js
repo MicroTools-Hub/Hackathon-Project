@@ -5,7 +5,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   isLidUser
 } from "@whiskeysockets/baileys";
-import { useAuthState } from "../utils/waSession.js";
+import { useAuthState, clearSavedSession } from "../utils/waSession.js";
 import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
 import pino from "pino";
@@ -165,13 +165,16 @@ async function handleConnectionUpdate(update) {
     const loggedOut = statusCode === DisconnectReason.loggedOut;
     const wasQrPending = globalThis.wholesaleLedgerWhatsAppStatus?.qr_pending === true;
     
+    socket = null; // Clean up old closed socket reference to allow new connections
     globalThis.wholesaleLedgerWhatsAppStatus = { connected: false, qr_pending: false, statusCode };
     logger.warn("WhatsApp connection closed", { statusCode, loggedOut });
     store.addConnectionEvent("closed", "WhatsApp connection closed", { statusCode });
     sseManager.connection({ status: "closed", message: "WhatsApp connection closed", statusCode });
     sseManager.whatsappStatus("disconnected");
  
-    if (!loggedOut) {
+    const isBadSession = loggedOut || statusCode === 440 || statusCode === 411 || statusCode === 401;
+
+    if (!isBadSession) {
       // Always increment reconnect attempts (including QR timeouts) to prevent
       // an infinite reconnect loop that causes memory exhaustion and OOM crash.
       reconnectAttempts += 1;
@@ -194,18 +197,18 @@ async function handleConnectionUpdate(update) {
       } else {
         logger.warn("Max WhatsApp reconnect attempts reached — giving up. Restart the server or re-scan QR.", { attempts: reconnectAttempts });
       }
-    } else if (loggedOut) {
-      logger.warn("WhatsApp logged out. Clearing session files and restarting WhatsApp client to generate new QR...");
+    } else {
+      logger.warn("WhatsApp session is invalid or logged out. Clearing session files/Supabase and restarting client...", { statusCode, loggedOut });
       (async () => {
         try {
           await stopWhatsAppClient();
-          await fs.rm(config.sessionDir, { recursive: true, force: true });
-          logger.info("Session directory cleared. Initiating fresh connection in 2 seconds...");
+          await clearSavedSession(config.sessionDir);
+          logger.info("WhatsApp session cleared completely. Initiating fresh connection in 2 seconds...");
           setTimeout(() => {
-            startWhatsAppClient().catch((error) => logger.error("WhatsApp restart failed after logout:", { error: error.message }));
+            startWhatsAppClient().catch((error) => logger.error("WhatsApp restart failed after session clear:", { error: error.message }));
           }, 2000);
         } catch (err) {
-          logger.error("Failed to clear session files on logout:", { error: err.message });
+          logger.error("Failed to clear session on bad session/logout:", { error: err.message });
         }
       })();
     }
