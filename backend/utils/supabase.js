@@ -2,25 +2,28 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "../config.js";
 import { logger } from "./logger.js";
 
-if (!config.supabase.url || !config.supabase.serviceRoleKey) {
-  logger.warn("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set — trusted number sync disabled");
+const isConfigured = !!(config.supabase.url && config.supabase.serviceRoleKey);
+
+if (!isConfigured) {
+  logger.warn("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set — trusted number sync disabled, falling back to .env");
 }
 
-// Service role client: bypasses RLS, safe for server-side use only.
-// NEVER expose this key to the browser / frontend.
-export const supabase = createClient(
-  config.supabase.url,
-  config.supabase.serviceRoleKey,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Only create the client when both values are present.
+// If either is missing the app still boots; all Supabase helpers become no-ops.
+export const supabase = isConfigured
+  ? createClient(
+      config.supabase.url,
+      config.supabase.serviceRoleKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+  : null;
 
 /**
  * Fetch all trusted_number rows for the given businessId.
- * Returns an array of { phone, label, active, last_message_at, created_at }.
  * Returns null if Supabase is not configured or the query fails.
  */
 export async function fetchTrustedNumbersFromSupabase(businessId) {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey || !businessId) return null;
+  if (!isConfigured || !supabase || !businessId) return null;
   const { data, error } = await supabase
     .from("trusted_numbers")
     .select("phone, label, active, last_message_at, created_at")
@@ -39,7 +42,7 @@ export async function fetchTrustedNumbersFromSupabase(businessId) {
  * Used as a safety-net fallback when the in-memory cache misses.
  */
 export async function checkTrustedNumberInSupabase(businessId, phone) {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey || !businessId) return false;
+  if (!isConfigured || !supabase || !businessId) return false;
   const { data, error } = await supabase
     .from("trusted_numbers")
     .select("phone, active")
@@ -59,7 +62,7 @@ export async function checkTrustedNumberInSupabase(businessId, phone) {
  * Upsert a trusted number row scoped to the given businessId.
  */
 export async function upsertTrustedNumberInSupabase(businessId, { phone, label = "Staff", active = true }) {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey || !businessId) return;
+  if (!isConfigured || !supabase || !businessId) return;
   const { error } = await supabase
     .from("trusted_numbers")
     .upsert({ business_id: businessId, phone, label, active }, { onConflict: "business_id,phone" });
@@ -73,7 +76,7 @@ export async function upsertTrustedNumberInSupabase(businessId, { phone, label =
  * Delete a trusted number row scoped to the given businessId.
  */
 export async function deleteTrustedNumberFromSupabase(businessId, phone) {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey || !businessId) return;
+  if (!isConfigured || !supabase || !businessId) return;
   const { error } = await supabase
     .from("trusted_numbers")
     .delete()
@@ -89,7 +92,7 @@ export async function deleteTrustedNumberFromSupabase(businessId, phone) {
  * Update a single field on a trusted number row, scoped to the given businessId.
  */
 export async function patchTrustedNumberInSupabase(businessId, phone, patch) {
-  if (!config.supabase.url || !config.supabase.serviceRoleKey || !businessId) return;
+  if (!isConfigured || !supabase || !businessId) return;
   const { error } = await supabase
     .from("trusted_numbers")
     .update(patch)
