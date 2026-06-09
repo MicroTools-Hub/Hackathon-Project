@@ -10,6 +10,7 @@ import { store } from "./store/memory.js";
 import { sseManager } from "./sse/manager.js";
 import { logger } from "./utils/logger.js";
 import { scheduleDailyReminders } from "./jobs/reminders.js";
+import { hasSavedSession } from "./utils/waSession.js";
 
 await fs.mkdir(config.sessionDir, { recursive: true });
 await fs.mkdir(config.uploadsDir, { recursive: true });
@@ -55,7 +56,19 @@ const server = app.listen(config.port, config.host, async () => {
       logger.error("Failed to start WhatsApp client", { error: error.message });
     }
   } else {
-    logger.info("WhatsApp startup skipped because START_WHATSAPP=false");
+    logger.info("WhatsApp startup skipped because START_WHATSAPP=false. Checking for saved session...");
+    hasSavedSession(config.sessionDir).then((hasSession) => {
+      if (hasSession) {
+        logger.info("Saved WhatsApp session found. Auto-starting WhatsApp client...");
+        startWhatsAppClient().catch((error) => {
+          logger.error("Failed to auto-start WhatsApp client from saved session", { error: error.message });
+        });
+      } else {
+        logger.info("No saved WhatsApp session found. WhatsApp will remain stopped until manually started.");
+      }
+    }).catch((err) => {
+      logger.error("Error checking for saved WhatsApp session on startup", { error: err.message });
+    });
   }
 });
 

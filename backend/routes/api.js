@@ -7,9 +7,10 @@ import { processTextMessage } from "../processors/router.js";
 import { transcribeAudio } from "../processors/transcribe.js";
 import { ocrPaymentImage } from "../processors/ocr.js";
 import { geminiQueue } from "../processors/queue.js";
-import { getLatestQrDataUrl, getWhatsAppStatus } from "../whatsapp/client.js";
+import { getLatestQrDataUrl, getWhatsAppStatus, startWhatsAppClient, stopWhatsAppClient } from "../whatsapp/client.js";
 import { sendOwnerAlert, sendReminder, sendReminderMessage } from "../whatsapp/sender.js";
 import { normalizePhone } from "../utils/format.js";
+import { logger } from "../utils/logger.js";
 
 const upload = multer({
   dest: config.uploadsDir,
@@ -58,38 +59,390 @@ export function createApiRouter() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WholesaleLedger WhatsApp QR</title>
+  <title>WhatsApp Control Center | WholesaleLedger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Arial, sans-serif; background: #111; color: #f8f8f8; }
-    main { width: min(92vw, 440px); text-align: center; }
-    img { width: min(82vw, 320px); height: min(82vw, 320px); background: white; border: 12px solid white; border-radius: 8px; }
-    .status { margin: 14px 0 6px; font-weight: 700; }
-    .hint { color: #c8c8c8; line-height: 1.45; }
+    :root {
+      --bg-gradient: radial-gradient(circle at top, #141e30, #243b55);
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #ffffff;
+      --text-secondary: #b0c4de;
+      --brand-green: #25d366;
+      --brand-green-hover: #20ba56;
+      --danger-red: #ff4757;
+      --danger-red-hover: #ff2e44;
+      --glow-color: rgba(37, 211, 102, 0.2);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Outfit', sans-serif;
+      background: #0b0f19;
+      background-image: var(--bg-gradient);
+      color: var(--text-primary);
+      padding: 20px;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 480px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 0%, var(--text-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 30px;
+      font-weight: 300;
+    }
+    
+    .qr-container {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      margin: 0 auto 30px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .qr-container.active-qr {
+      box-shadow: 0 0 30px var(--glow-color);
+      border-color: rgba(37, 211, 102, 0.3);
+    }
+    
+    .qr-image {
+      width: 250px;
+      height: 250px;
+      border-radius: 12px;
+      background: white;
+      border: 8px solid white;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      animation: fadeIn 0.5s ease;
+    }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      text-transform: capitalize;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #747d8c;
+      box-shadow: 0 0 8px #747d8c;
+    }
+    
+    .status-connected .status-dot {
+      background: var(--brand-green);
+      box-shadow: 0 0 10px var(--brand-green);
+    }
+    
+    .status-qr_pending .status-dot {
+      background: #ffaa00;
+      box-shadow: 0 0 10px #ffaa00;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .status-starting .status-dot {
+      background: #00d2d3;
+      box-shadow: 0 0 10px #00d2d3;
+      animation: pulse 1.5s infinite;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-primary {
+      background: var(--brand-green);
+      color: #0b0f19;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      background: var(--brand-green-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(37, 211, 102, 0.3);
+    }
+    
+    .btn-danger {
+      background: rgba(255, 71, 87, 0.1);
+      color: var(--danger-red);
+      border: 1px solid rgba(255, 71, 87, 0.2);
+    }
+    
+    .btn-danger:hover:not(:disabled) {
+      background: var(--danger-red);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 71, 87, 0.3);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .instructions {
+      text-align: left;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    
+    .instructions h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+    }
+    
+    .instructions ol {
+      list-style-position: inside;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    
+    .instructions li {
+      margin-bottom: 6px;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.5; }
+      100% { transform: scale(1); opacity: 1; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>WhatsApp QR</h1>
-    <div id="slot"><p>Loading QR...</p></div>
-    <p class="status" id="status">Checking...</p>
-    <p class="hint">Scan from WhatsApp > Linked devices > Link a device. This page refreshes the QR automatically.</p>
-  </main>
+  <div class="container">
+    <h1>WhatsApp Control</h1>
+    <p class="subtitle">WholesaleLedger Agent Gateway</p>
+    
+    <div id="badge-wrapper">
+      <div class="status-badge" id="status-badge">
+        <span class="status-dot"></span>
+        <span id="status-text">Checking Status...</span>
+      </div>
+    </div>
+    
+    <div class="qr-container" id="qr-container">
+      <div id="qr-slot">
+        <p style="color: var(--text-secondary); font-size: 14px;">Initializing connection...</p>
+      </div>
+    </div>
+    
+    <div id="action-wrapper">
+      <button class="btn btn-primary" id="action-btn" disabled>
+        Please Wait
+      </button>
+    </div>
+    
+    <div class="instructions">
+      <h3>Connection Steps</h3>
+      <ol>
+        <li>Click "Start WhatsApp" above to spawn a WhatsApp client.</li>
+        <li>Once the QR code displays, open WhatsApp on your phone.</li>
+        <li>Tap <strong>Settings</strong> &gt; <strong>Linked Devices</strong> &gt; <strong>Link a Device</strong>.</li>
+        <li>Scan the QR code to connect. Session will persist.</li>
+      </ol>
+    </div>
+  </div>
+
   <script>
-    async function refreshQr() {
+    const qrContainer = document.getElementById("qr-container");
+    const qrSlot = document.getElementById("qr-slot");
+    const statusBadge = document.getElementById("status-badge");
+    const statusText = document.getElementById("status-text");
+    const actionBtn = document.getElementById("action-btn");
+    
+    let currentStatus = null;
+    let isRequesting = false;
+    
+    async function updateStatus() {
+      if (isRequesting) return;
       const response = await fetch("/api/qr").catch(() => null);
       if (!response) return;
       const data = await response.json();
-      document.getElementById("status").textContent = data.status || "unknown";
-      document.getElementById("slot").innerHTML = data.qr
-        ? '<img src="' + data.qr + '" alt="WhatsApp QR">'
-        : '<p>No QR available. Restart backend with START_WHATSAPP=true.</p>';
-      if (data.status === "connected") document.getElementById("status").textContent = "connected";
+      
+      const status = data.status; // disconnected, connected, qr_pending
+      
+      if (status !== currentStatus) {
+        currentStatus = status;
+        
+        // Update badge class
+        statusBadge.className = "status-badge status-" + status;
+        statusText.textContent = status === "qr_pending" ? "Waiting for Scan" : status;
+        
+        // Update controls based on status
+        if (status === "connected") {
+          qrContainer.classList.remove("active-qr");
+          qrSlot.innerHTML = '<div style="color: var(--brand-green); font-weight: 600; font-size: 16px;">✓ WhatsApp Connected</div>';
+          actionBtn.className = "btn btn-danger";
+          actionBtn.textContent = "Disconnect WhatsApp";
+          actionBtn.disabled = false;
+          actionBtn.onclick = handleStop;
+        } else if (status === "qr_pending" && data.qr) {
+          qrContainer.classList.add("active-qr");
+          qrSlot.innerHTML = '<img class="qr-image" src="' + data.qr + '" alt="WhatsApp QR">';
+          actionBtn.className = "btn btn-danger";
+          actionBtn.textContent = "Cancel Connection";
+          actionBtn.disabled = false;
+          actionBtn.onclick = handleStop;
+        } else {
+          // Disconnected
+          qrContainer.classList.remove("active-qr");
+          qrSlot.innerHTML = '<p style="color: var(--text-secondary); font-size: 14px;">WhatsApp is offline</p>';
+          actionBtn.className = "btn btn-primary";
+          actionBtn.textContent = "Start WhatsApp Client";
+          actionBtn.disabled = false;
+          actionBtn.onclick = handleStart;
+        }
+      } else if (status === "qr_pending" && data.qr) {
+        // Refresh QR image if it has changed
+        const existingImg = qrSlot.querySelector("img");
+        if (existingImg && existingImg.src !== data.qr) {
+          existingImg.src = data.qr;
+        } else if (!existingImg) {
+          qrSlot.innerHTML = '<img class="qr-image" src="' + data.qr + '" alt="WhatsApp QR">';
+        }
+      }
     }
-    refreshQr();
-    setInterval(refreshQr, 2000);
+    
+    async function handleStart() {
+      actionBtn.disabled = true;
+      actionBtn.textContent = "Starting Client...";
+      statusText.textContent = "Starting...";
+      statusBadge.className = "status-badge status-starting";
+      
+      isRequesting = true;
+      const response = await fetch("/api/whatsapp/start", { method: "POST" }).catch(() => null);
+      isRequesting = false;
+      
+      if (response && response.ok) {
+        currentStatus = null; // force update
+        updateStatus();
+      } else {
+        alert("Failed to start WhatsApp client.");
+        actionBtn.disabled = false;
+        actionBtn.textContent = "Start WhatsApp Client";
+      }
+    }
+    
+    async function handleStop() {
+      if (!confirm("Are you sure you want to stop/disconnect the WhatsApp client?")) return;
+      actionBtn.disabled = true;
+      actionBtn.textContent = "Stopping Client...";
+      statusText.textContent = "Stopping...";
+      statusBadge.className = "status-badge status-starting";
+      
+      isRequesting = true;
+      const response = await fetch("/api/whatsapp/stop", { method: "POST" }).catch(() => null);
+      isRequesting = false;
+      
+      if (response && response.ok) {
+        currentStatus = null; // force update
+        updateStatus();
+      } else {
+        alert("Failed to stop WhatsApp client.");
+        actionBtn.disabled = false;
+      }
+    }
+    
+    updateStatus();
+    setInterval(updateStatus, 2000);
   </script>
 </body>
 </html>`);
+  });
+
+  router.post("/whatsapp/start", async (req, res, next) => {
+    try {
+      const status = getWhatsAppStatus();
+      if (status.connected || status.qr_pending) {
+        return res.json({ ok: true, status: whatsappStatusLabel(), message: "Already running" });
+      }
+      logger.info("Manual WhatsApp start requested via API");
+      // Asynchronous non-blocking call
+      startWhatsAppClient().catch((error) => {
+        logger.error("Failed to start WhatsApp client from API", { error: error.message });
+      });
+      res.json({ ok: true, status: "starting" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/whatsapp/stop", async (req, res, next) => {
+    try {
+      logger.info("Manual WhatsApp stop requested via API");
+      await stopWhatsAppClient();
+      res.json({ ok: true, status: "disconnected" });
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/sse", (req, res) => {

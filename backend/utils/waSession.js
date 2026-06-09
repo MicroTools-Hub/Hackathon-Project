@@ -13,6 +13,8 @@ import {
   proto,
   useMultiFileAuthState
 } from "@whiskeysockets/baileys";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { supabase } from "./supabase.js";
 import { config } from "../config.js";
 import { logger } from "./logger.js";
@@ -93,4 +95,32 @@ export async function useAuthState(sessionDir) {
     // Called by Baileys whenever credentials change
     saveCreds: () => dbWrite("creds", creds)
   };
+}
+
+/**
+ * Check if a session already exists either in Supabase or local filesystem
+ */
+export async function hasSavedSession(sessionDir) {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("wa_sessions")
+        .select("key")
+        .eq("key", "creds")
+        .maybeSingle();
+      if (error) return false;
+      return !!data;
+    } catch (err) {
+      logger.warn("Failed to check saved session in Supabase", { error: err.message });
+      return false;
+    }
+  } else {
+    try {
+      const credsPath = path.join(sessionDir, "creds.json");
+      await fs.access(credsPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }

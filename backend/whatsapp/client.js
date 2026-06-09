@@ -90,6 +90,10 @@ export function getLatestQrDataUrl() {
 }
 
 export async function startWhatsAppClient() {
+  if (socket) {
+    logger.info("WhatsApp client is already running, skipping start");
+    return socket;
+  }
   await fs.mkdir(config.sessionDir, { recursive: true });
   await loadLidMappingsFromDisk();
   const { state, saveCreds } = await useAuthState(config.sessionDir);
@@ -213,8 +217,15 @@ export async function stopWhatsAppClient() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  if (!socket) return;
-  socket.ev.off("creds.update", saveCredsHandler);
-  socket.end?.();
-  socket = null;
+  if (socket) {
+    try {
+      socket.ev.off("creds.update", saveCredsHandler);
+      socket.end?.();
+    } catch (err) {
+      logger.warn("Error ending WhatsApp socket connection", { error: err.message });
+    }
+    socket = null;
+  }
+  globalThis.wholesaleLedgerWhatsAppStatus = { connected: false, qr_pending: false };
+  latestQrDataUrl = null;
 }
