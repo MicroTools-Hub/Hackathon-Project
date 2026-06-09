@@ -5,7 +5,7 @@
   const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
   const DEFAULT_SSE_ENDPOINT = isLocalHost
     ? "http://127.0.0.1:3000/sse"
-    : "https://hackathon-project-production-4144.up.railway.app/sse";
+    : "https://smirk-blighted-marvelous.ngrok-free.dev/sse";
   const STORES = ["businesses", "clients", "invoices", "payments", "settings", "sync_queue"];
   let dbPromise;
   let seedPromise;
@@ -338,8 +338,8 @@
       resolvedDefaultEndpoint = baseUrl ? `${baseUrl}/sse` : "http://127.0.0.1:3000/sse";
     }
     if (settings) {
-      // If the endpoint is pointing to the old trycloudflare, migrate it to the active endpoint
-      if (settings.sse_endpoint && settings.sse_endpoint.includes("trycloudflare.com")) {
+      // If the endpoint is pointing to the old trycloudflare or old railway, migrate it to the active endpoint
+      if (settings.sse_endpoint && (settings.sse_endpoint.includes("trycloudflare.com") || settings.sse_endpoint.includes("railway.app"))) {
         settings.sse_endpoint = resolvedDefaultEndpoint;
         await db.put("settings", settings);
       }
