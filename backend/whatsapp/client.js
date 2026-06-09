@@ -3,9 +3,9 @@ import path from "node:path";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
-  useMultiFileAuthState,
   isLidUser
 } from "@whiskeysockets/baileys";
+import { useAuthState } from "../utils/waSession.js";
 import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
 import pino from "pino";
@@ -92,7 +92,7 @@ export function getLatestQrDataUrl() {
 export async function startWhatsAppClient() {
   await fs.mkdir(config.sessionDir, { recursive: true });
   await loadLidMappingsFromDisk();
-  const { state, saveCreds } = await useMultiFileAuthState(config.sessionDir);
+  const { state, saveCreds } = await useAuthState(config.sessionDir);
   saveCredsHandler = saveCreds;
   const { version } = await fetchLatestBaileysVersion();
 
@@ -168,21 +168,27 @@ async function handleConnectionUpdate(update) {
     sseManager.whatsappStatus("disconnected");
  
     if (!loggedOut) {
+      // Always increment reconnect attempts (including QR timeouts) to prevent
+      // an infinite reconnect loop that causes memory exhaustion and OOM crash.
+      reconnectAttempts += 1;
       const isQrTimeout = wasQrPending || statusCode === 408 || statusCode === 503;
-      if (isQrTimeout || reconnectAttempts < MAX_RECONNECTS) {
-        if (!isQrTimeout) {
-          reconnectAttempts += 1;
-        }
+      if (reconnectAttempts <= MAX_RECONNECTS) {
         logger.info("Reconnecting WhatsApp", { attempt: reconnectAttempts, max: MAX_RECONNECTS, isQrTimeout });
         if (reconnectTimer) clearTimeout(reconnectTimer);
+        // Back off longer for QR timeouts to avoid hammering WhatsApp servers
+        const delay = isQrTimeout ? 15_000 : 5_000;
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           if (getWhatsAppStatus().connected) {
             logger.info("Skipping WhatsApp reconnect because socket is already connected");
             return;
           }
+          // Reset counter so next manual reconnect gets full retries
+          reconnectAttempts = 0;
           startWhatsAppClient().catch((error) => logger.error("WhatsApp reconnect failed", { error: error.message }));
-        }, 5000);
+        }, delay);
+      } else {
+        logger.warn("Max WhatsApp reconnect attempts reached — giving up. Restart the server or re-scan QR.", { attempts: reconnectAttempts });
       }
     } else if (loggedOut) {
       logger.warn("WhatsApp logged out. Clearing session files and restarting WhatsApp client to generate new QR...");
