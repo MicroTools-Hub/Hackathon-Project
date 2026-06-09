@@ -12,6 +12,9 @@
     "tunnel:temp": "..\\tools\\cloudflared.exe tunnel --url http://127.0.0.1:3000",
     "tunnel:ngrok": "..\\tools\\ngrok.exe http 127.0.0.1:3000 --url smirk-blighted-marvelous.ngrok-free.dev"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@google/generative-ai": "latest",
     "@supabase/supabase-js": "^2.108.0",
