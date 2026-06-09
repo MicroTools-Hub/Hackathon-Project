@@ -1,4 +1,46 @@
 (function () {
+  // Handle query parameter ?clear_db=true or ?clear-db=true to clear local database and cache
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("clear_db") || params.has("clear-db") || params.has("reset_db") || params.has("reset-db")) {
+    console.log("Clearing IndexedDB, LocalStorage, and SessionStorage as requested by query parameter...");
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {
+      console.error("Failed to clear local/session storage:", e);
+    }
+    
+    // Clear cookies too just in case
+    try {
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+    } catch (e) {}
+
+    const req = indexedDB.deleteDatabase("WholesaleLedgerDB");
+    req.onsuccess = function () {
+      console.log("WholesaleLedgerDB deleted successfully");
+      params.delete("clear_db");
+      params.delete("clear-db");
+      params.delete("reset_db");
+      params.delete("reset-db");
+      const newSearch = params.toString();
+      const newUrl = window.location.origin + window.location.pathname + (newSearch ? "?" + newSearch : "") + window.location.hash;
+      window.location.replace(newUrl);
+    };
+    req.onerror = function () {
+      console.error("Error deleting database");
+      alert("Failed to clear local database. Please try clearing your browser site data manually.");
+    };
+    req.onblocked = function () {
+      console.warn("Database deletion blocked. Please close other tabs and try again.");
+      alert("Database deletion is blocked. Please close all other tabs of WholesaleLedger, then reload this page.");
+    };
+    return;
+  }
+
   const DB_NAME = "WholesaleLedgerDB";
   const DB_VERSION = 1;
   const DAY = 24 * 60 * 60 * 1000;
