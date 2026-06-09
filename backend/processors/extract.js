@@ -148,26 +148,61 @@ export function heuristicExtract(text, context = {}, reason = "heuristic") {
 
 export function parseJson(text) {
   const raw = String(text || "").trim();
-  const cleanedOriginal = raw
-    .replace(/^```json/i, "")
-    .replace(/^```/i, "")
-    .replace(/```$/i, "")
-    .trim();
+  
+  // 1. Try parsed directly
   try {
-    return JSON.parse(cleanedOriginal);
-  } catch (e) {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start !== -1 && end !== -1 && end > start) {
-      const sliced = raw.slice(start, end + 1);
-      try {
-        return JSON.parse(sliced);
-      } catch (innerErr) {
-        throw e;
+    return JSON.parse(raw);
+  } catch (e) {}
+
+  // 2. Try removing markdown blocks first if present
+  // e.g. ```json ... ``` or ``` ... ```
+  const markdownRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+  let match;
+  while ((match = markdownRegex.exec(raw)) !== null) {
+    const candidate = match[1].trim();
+    try {
+      return JSON.parse(candidate);
+    } catch (e) {}
+  }
+
+  // 3. Fallback: find the first '{' and match it with its corresponding '}'
+  // If there are multiple matching braces, let's trace brace balancing to find the exact JSON object
+  let braceCount = 0;
+  let start = -1;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '{') {
+      if (start === -1) {
+        start = i;
+      }
+      braceCount++;
+    } else if (raw[i] === '}') {
+      if (start !== -1) {
+        braceCount--;
+        if (braceCount === 0) {
+          const candidate = raw.slice(start, i + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch (e) {
+            // keep searching or let it fall back
+          }
+        }
       }
     }
-    throw e;
   }
+
+  // 4. If brace balancing didn't yield a valid JSON, let's try the simple first/last index fallback
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const sliced = raw.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(sliced);
+    } catch (innerErr) {
+      // ignore, we'll throw the original or a custom error
+    }
+  }
+
+  throw new Error("Could not extract valid JSON from Gemini response");
 }
 
 
