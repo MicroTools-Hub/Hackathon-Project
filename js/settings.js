@@ -77,12 +77,12 @@
     document.querySelector("[data-import-json-file]")?.addEventListener("change", importBackup);
     document.querySelector("[data-clear-data]")?.addEventListener("click", () => openConfirm("Clear all ledger data", "Client, invoice, and payment records for this business will be removed.", async () => {
       await window.WLDB.clearActiveBusinessData();
-      window.WLNotify.warning("Data cleared", state.business.name);
+      window.WLNotify.warning("Data cleared", state.business?.name || "Business");
       await loadAndRender();
     }));
     document.querySelector("[data-reset-payments]")?.addEventListener("click", () => openConfirm("Reset all payment records", "Invoices and clients remain, but every payment record will be removed.", async () => {
       await window.WLDB.clearPayments();
-      window.WLNotify.warning("Payments reset", state.business.name);
+      window.WLNotify.warning("Payments reset", state.business?.name || "Business");
       await loadAndRender();
     }));
     document.querySelector("[data-delete-business]")?.addEventListener("click", () => openConfirm("Delete business", "This removes the active business and its local ledger records.", async () => {
@@ -369,7 +369,7 @@
     const modal = document.getElementById("confirmModal");
     modal.querySelector("[data-confirm-title]").textContent = title;
     modal.querySelector("[data-confirm-body]").textContent = body;
-    modal.querySelector("[data-confirm-name]").textContent = state.business.name;
+    modal.querySelector("[data-confirm-name]").textContent = state.business?.name || "";
     modal.querySelector("[name='confirm_text']").value = "";
     window.WLUI.openModal(modal);
   }
@@ -377,7 +377,9 @@
   async function runConfirm() {
     const modal = document.getElementById("confirmModal");
     const input = modal.querySelector("[name='confirm_text']");
-    if (input.value.trim() !== state.business.name) {
+    const inputName = input.value.trim().toLowerCase();
+    const targetName = (state.business?.name || "").trim().toLowerCase();
+    if (inputName !== targetName) {
       window.WLNotify.error("Confirmation mismatch", "Type the business name exactly");
       input.focus();
       return;

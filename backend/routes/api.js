@@ -626,6 +626,17 @@ export function createApiRouter() {
     res.json({ ok: true });
   });
 
+  router.post("/business/clear-data", (req, res) => {
+    store.clearLedgerData();
+    res.json({ ok: true });
+  });
+
+  router.post("/payments/clear-data", (req, res) => {
+    store.clearPayments();
+    res.json({ ok: true });
+  });
+
+
   router.post("/test/text", async (req, res, next) => {
     try {
       const text = String(req.body.text || "");

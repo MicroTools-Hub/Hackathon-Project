@@ -1058,39 +1058,211 @@
     await write.done;
   }
 
-  async function clearActiveBusinessData() {
+  async function clearActiveBusinessData(skipRestartSync = false) {
+    console.log("[WLDB] Clearing active business data...");
+    // 1. Temporarily stop the sync engine to prevent race conditions during deletion
+    if (window.WLSync && typeof window.WLSync.stop === "function") {
+      console.log("[WLDB] Stopping sync engine during clear...");
+      window.WLSync.stop();
+    }
+
+    // 2. Clear backend database first.
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/business/clear-data", { method: "POST" });
+        console.log("[WLDB] Backend ledger records cleared.");
+      } catch (err) {
+        console.warn("Failed to clear backend ledger data:", err);
+      }
+    }
+
+    // 3. Clear local IndexedDB stores (including orphans without business_id)
     const db = await init();
     const businessId = await getActiveBusinessId();
-    const [clients, invoices, payments] = await Promise.all([
-      getClients(businessId),
-      getInvoices(businessId),
-      getPayments({ business_id: businessId })
-    ]);
+
     const tx = db.transaction(["clients", "invoices", "payments"], "readwrite");
-    clients.forEach((client) => tx.objectStore("clients").delete(client.id));
-    invoices.forEach((invoice) => tx.objectStore("invoices").delete(invoice.id));
-    payments.forEach((payment) => tx.objectStore("payments").delete(payment.id));
+    const clientsStore = tx.objectStore("clients");
+    const invoicesStore = tx.objectStore("invoices");
+    const paymentsStore = tx.objectStore("payments");
+
+    const [allClients, allInvoices, allPayments] = await Promise.all([
+      clientsStore.getAll(),
+      invoicesStore.getAll(),
+      paymentsStore.getAll()
+    ]);
+
+    let deletedClientsCount = 0;
+    let deletedInvoicesCount = 0;
+    let deletedPaymentsCount = 0;
+
+    allClients.forEach((client) => {
+      if (!client.business_id || client.business_id === businessId) {
+        clientsStore.delete(client.id);
+        deletedClientsCount++;
+      }
+    });
+
+    allInvoices.forEach((invoice) => {
+      if (!invoice.business_id || invoice.business_id === businessId) {
+        invoicesStore.delete(invoice.id);
+        deletedInvoicesCount++;
+      }
+    });
+
+    allPayments.forEach((payment) => {
+      if (!payment.business_id || payment.business_id === businessId) {
+        paymentsStore.delete(payment.id);
+        deletedPaymentsCount++;
+      }
+    });
+
     await tx.done;
+    console.log(`[WLDB] Local IndexedDB cleared: ${deletedClientsCount} clients, ${deletedInvoicesCount} invoices, ${deletedPaymentsCount} payments.`);
+
+    // 4. Delete from Supabase
+    if (window.WLAuth && businessId) {
+      const sb = window.WLAuth.getClient();
+      if (sb) {
+        console.log("[WLDB] Deleting ledger records from Supabase for business:", businessId);
+        try {
+          // Delete payments referencing invoices first to avoid foreign key issues
+          const pRes = await sb.from("payments").delete().eq("business_id", businessId);
+          if (pRes.error) console.error("[WLDB] Supabase payments delete error:", pRes.error);
+          
+          const iRes = await sb.from("invoices").delete().eq("business_id", businessId);
+          if (iRes.error) console.error("[WLDB] Supabase invoices delete error:", iRes.error);
+          
+          const cRes = await sb.from("clients").delete().eq("business_id", businessId);
+          if (cRes.error) console.error("[WLDB] Supabase clients delete error:", cRes.error);
+          
+          console.log("[WLDB] Supabase deletion requests completed.");
+        } catch (sbErr) {
+          console.warn("Supabase clear warning:", sbErr);
+        }
+      }
+    }
+
+    // 5. Clear sync timestamp from localStorage so sync starts fresh next time
+    localStorage.removeItem("wl_last_sync_time");
+
+    // 6. Restart the sync engine
+    if (!skipRestartSync && window.WLSync && typeof window.WLSync.start === "function") {
+      console.log("[WLDB] Restarting sync engine...");
+      window.WLSync.start();
+    }
   }
 
   async function clearPayments() {
+    console.log("[WLDB] Resetting payment records...");
+    // 1. Stop sync engine to avoid race conditions
+    if (window.WLSync && typeof window.WLSync.stop === "function") {
+      console.log("[WLDB] Stopping sync engine during clear payments...");
+      window.WLSync.stop();
+    }
+
+    // 2. Clear backend payments first
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/payments/clear-data", { method: "POST" });
+        console.log("[WLDB] Backend payments cleared.");
+      } catch (err) {
+        console.warn("Failed to clear backend payments:", err);
+      }
+    }
+
+    // 3. Clear local payments in IndexedDB (including orphans)
     const db = await init();
     const businessId = await getActiveBusinessId();
-    const payments = await getPayments({ business_id: businessId });
+
     const tx = db.transaction("payments", "readwrite");
-    payments.forEach((payment) => tx.store.delete(payment.id));
+    const paymentsStore = tx.store;
+    const allPayments = await paymentsStore.getAll();
+    let deletedPaymentsCount = 0;
+    
+    allPayments.forEach((payment) => {
+      if (!payment.business_id || payment.business_id === businessId) {
+        paymentsStore.delete(payment.id);
+        deletedPaymentsCount++;
+      }
+    });
     await tx.done;
     await refreshInvoiceStatuses(businessId);
+    console.log(`[WLDB] Local IndexedDB payments cleared: ${deletedPaymentsCount} payments.`);
+
+    // 4. Delete payments from Supabase
+    if (window.WLAuth && businessId) {
+      const sb = window.WLAuth.getClient();
+      if (sb) {
+        console.log("[WLDB] Deleting payments from Supabase for business:", businessId);
+        try {
+          const pRes = await sb.from("payments").delete().eq("business_id", businessId);
+          if (pRes.error) console.error("[WLDB] Supabase payments delete error:", pRes.error);
+        } catch (sbErr) {
+          console.warn("Supabase payments clear warning:", sbErr);
+        }
+      }
+    }
+
+    // 5. Reset the last sync time to force sync to check all tables again
+    localStorage.removeItem("wl_last_sync_time");
+
+    // 6. Restart sync engine
+    if (window.WLSync && typeof window.WLSync.start === "function") {
+      console.log("[WLDB] Restarting sync engine...");
+      window.WLSync.start();
+    }
   }
 
   async function deleteActiveBusiness() {
+    console.log("[WLDB] Deleting active business...");
+    // Stop sync engine first
+    if (window.WLSync && typeof window.WLSync.stop === "function") {
+      window.WLSync.stop();
+    }
+
     const db = await init();
     const businessId = await getActiveBusinessId();
-    await clearActiveBusinessData();
+    
+    // Clear all business-related ledger data, but skip starting sync engine
+    await clearActiveBusinessData(true);
+    
+    // Delete the business record locally
     await db.delete("businesses", businessId);
+
+    // Delete business from Supabase
+    if (window.WLAuth && businessId) {
+      const sb = window.WLAuth.getClient();
+      if (sb) {
+        console.log("[WLDB] Deleting business from Supabase...");
+        try {
+          const bRes = await sb.from("businesses").delete().eq("id", businessId);
+          if (bRes.error) console.error("[WLDB] Supabase delete business error:", bRes.error);
+        } catch (sbErr) {
+          console.warn("Supabase business delete warning:", sbErr);
+        }
+      }
+    }
+
+    // Delete business from backend (reset backend)
+    if (navigator.onLine) {
+      try {
+        await apiFetch("/api/reset", { method: "POST" });
+        console.log("[WLDB] Backend reset.");
+      } catch (err) {
+        console.warn("Failed to reset backend:", err);
+      }
+    }
+
+    // Remove last sync time so sync starts fresh on onboarding/new business
+    localStorage.removeItem("wl_last_sync_time");
+
     const remaining = await db.getAll("businesses");
     if (remaining.length) {
       await saveSettings({ active_business_id: remaining[0].id });
+      // Restart sync for remaining business
+      if (window.WLSync && typeof window.WLSync.start === "function") {
+        window.WLSync.start();
+      }
       return remaining[0];
     }
     const newBusiness = {
@@ -1103,8 +1275,14 @@
     };
     await db.put("businesses", newBusiness);
     await saveSettings({ active_business_id: newBusiness.id });
+    
+    // Restart sync for new business
+    if (window.WLSync && typeof window.WLSync.start === "function") {
+      window.WLSync.start();
+    }
     return newBusiness;
   }
+
 
   async function clearLocalLedgerData() {
     const db = await openDatabase();

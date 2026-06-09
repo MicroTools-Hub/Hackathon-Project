@@ -113,6 +113,54 @@
     };
   }
 
+  function autofitColumns(worksheet) {
+    if (!worksheet || !worksheet['!ref']) return;
+    const range = window.XLSX.utils.decode_range(worksheet['!ref']);
+    const cols = [];
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      let maxLen = 10; // default minimum width
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        const cell = worksheet[window.XLSX.utils.encode_cell({ c: C, r: R })];
+        if (cell && cell.v !== undefined && cell.v !== null) {
+          const valStr = cell.w ? String(cell.w) : String(cell.v);
+          maxLen = Math.max(maxLen, valStr.length);
+        }
+      }
+      cols.push({ wch: maxLen + 3 }); // add padding
+    }
+    worksheet['!cols'] = cols;
+  }
+
+  function formatSheetCells(worksheet, numericColumns) {
+    if (!worksheet || !worksheet['!ref']) return;
+    const range = window.XLSX.utils.decode_range(worksheet['!ref']);
+    const headers = [];
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cell = worksheet[window.XLSX.utils.encode_cell({ c: C, r: 0 })];
+      headers.push(cell ? String(cell.v).trim() : '');
+    }
+
+    for (let R = 1; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const header = headers[C];
+        if (!numericColumns.includes(header)) continue;
+        
+        const cellRef = window.XLSX.utils.encode_cell({ c: C, r: R });
+        const cell = worksheet[cellRef];
+        if (cell && typeof cell.v === 'number') {
+          cell.t = 'n'; // ensure type is number
+          if (header === "Days Overdue") {
+            cell.z = '#,##0'; // integer format
+          } else if (header === "Confidence") {
+            cell.z = '0.00'; // decimal format
+          } else {
+            cell.z = '#,##0.00'; // standard comma-separated currency/number format
+          }
+        }
+      }
+    }
+  }
+
   async function exportExcel(options = {}) {
     if (!window.XLSX) {
       window.WLNotify.error("Export unavailable", "SheetJS is not loaded");
@@ -174,9 +222,22 @@
       }));
 
     const workbook = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(summaryRows), "Summary");
-    window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(paymentRows), "All Payments");
-    window.XLSX.utils.book_append_sheet(workbook, window.XLSX.utils.json_to_sheet(overdueRows), "Overdue");
+
+    const summarySheet = window.XLSX.utils.json_to_sheet(summaryRows);
+    formatSheetCells(summarySheet, ["Total Invoiced", "Total Paid", "Balance", "Overdue Amount"]);
+    autofitColumns(summarySheet);
+    window.XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+    const paymentSheet = window.XLSX.utils.json_to_sheet(paymentRows);
+    formatSheetCells(paymentSheet, ["Amount", "Confidence"]);
+    autofitColumns(paymentSheet);
+    window.XLSX.utils.book_append_sheet(workbook, paymentSheet, "All Payments");
+
+    const overdueSheet = window.XLSX.utils.json_to_sheet(overdueRows);
+    formatSheetCells(overdueSheet, ["Balance", "Overdue Amount", "Days Overdue"]);
+    autofitColumns(overdueSheet);
+    window.XLSX.utils.book_append_sheet(workbook, overdueSheet, "Overdue");
+
     const month = new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(start));
     const year = new Date(start).getFullYear();
     const filename = `WholesaleLedger_${safeFileName(business?.name || "Business")}_${month}_${year}.xlsx`;

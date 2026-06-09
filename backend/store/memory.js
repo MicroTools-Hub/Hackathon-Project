@@ -866,6 +866,19 @@ export const store = {
     saveDb();
   },
 
+  clearLedgerData() {
+    clients = [];
+    transactions = [];
+    creditLimitAlerts = [];
+    saveDb();
+  },
+
+  clearPayments() {
+    transactions = transactions.filter((t) => t.type !== "payment");
+    saveDb();
+  },
+
+
   /** Public wrapper so handler.js (and any other module) can trigger a cache refresh. */
   async refreshTrustedNumbersFromSupabase() {
     return refreshTrustedNumbersCache();

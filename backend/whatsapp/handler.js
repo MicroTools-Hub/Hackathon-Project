@@ -88,8 +88,9 @@ async function handleSingleMessage(sock, message) {
     const text = content.conversation || content.extendedTextMessage?.text || content.imageMessage?.caption || content.documentMessage?.caption || "";
     const businessPrefix = store.getBusiness()?.prefix;
     const startsWithPrefix = businessPrefix && text.trim().toUpperCase().startsWith(businessPrefix.toUpperCase());
+    const isMedia = contentType === "audioMessage" || contentType === "imageMessage" || contentType === "documentMessage";
     
-    if (!isSelfChat && !startsWithPrefix) {
+    if (!isSelfChat && !startsWithPrefix && !isMedia) {
       logger.info("Ignoring WhatsApp message sent by linked account (not self-chat and doesn't start with prefix)", { id: message.key?.id });
       return;
     }

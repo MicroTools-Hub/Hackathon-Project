@@ -1,4 +1,4 @@
-const CACHE_NAME = "wholesaleledger-static-v24";
+const CACHE_NAME = "wholesaleledger-static-v26";
 const APP_SHELL = [
   "./",
   "./index.html",
