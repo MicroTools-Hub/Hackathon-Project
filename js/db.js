@@ -19,6 +19,26 @@
       });
     } catch (e) {}
 
+    // Unregister service workers and clear cache storage
+    try {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      if (window.caches) {
+        caches.keys().then((names) => {
+          for (const name of names) {
+            caches.delete(name);
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Failed to clear service worker and caches:", e);
+    }
+
     const req = indexedDB.deleteDatabase("WholesaleLedgerDB");
     req.onsuccess = function () {
       console.log("WholesaleLedgerDB deleted successfully");
