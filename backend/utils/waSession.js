@@ -27,9 +27,15 @@ async function dbRead(key) {
     .select("value")
     .eq("key", key)
     .maybeSingle();
-  if (error) { logger.warn("wa_sessions read error", { key, error: error.message }); return null; }
+  if (error) {
+    throw new Error(`wa_sessions read error for key ${key}: ${error.message}`);
+  }
   if (!data) return null;
-  try { return JSON.parse(data.value, BufferJSON.reviver); } catch { return null; }
+  try {
+    return JSON.parse(data.value, BufferJSON.reviver);
+  } catch (err) {
+    throw new Error(`wa_sessions JSON parse error for key ${key}: ${err.message}`);
+  }
 }
 
 async function dbWrite(key, value) {
@@ -59,7 +65,18 @@ export async function useAuthState(sessionDir) {
 
   logger.info("Using Supabase-backed WhatsApp auth state");
 
-  const creds = (await dbRead("creds")) || initAuthCreds();
+  let creds;
+  try {
+    creds = await dbRead("creds");
+  } catch (err) {
+    logger.error("Failed to load WhatsApp credentials from Supabase. Aborting client startup to prevent session overwrite.", { error: err.message });
+    throw err;
+  }
+
+  if (!creds) {
+    logger.info("No saved credentials found in Supabase. Initializing new auth credentials...");
+    creds = initAuthCreds();
+  }
 
   return {
     state: {

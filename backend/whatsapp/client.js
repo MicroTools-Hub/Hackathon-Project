@@ -172,7 +172,7 @@ async function handleConnectionUpdate(update) {
     sseManager.connection({ status: "closed", message: "WhatsApp connection closed", statusCode });
     sseManager.whatsappStatus("disconnected");
  
-    const isBadSession = loggedOut || statusCode === 440 || statusCode === 411 || statusCode === 401;
+    const isBadSession = loggedOut || statusCode === 401;
 
     if (!isBadSession) {
       // Always increment reconnect attempts (including QR timeouts) to prevent
