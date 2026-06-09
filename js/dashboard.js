@@ -501,6 +501,8 @@
       });
     }
 
+    state.reviewClients = clients;
+
     const clientSelect = modal.querySelector("[name='client_id']");
     if (clients.length) {
       clientSelect.innerHTML = clients.map((client) => `<option value="${client.id}">${escape(client.name)}</option>`).join("");
@@ -598,10 +600,28 @@
     if (!form.reportValidity()) return;
     const data = new FormData(form);
 
+    let clientId = data.get("client_id");
+    if (clientId && clientId.startsWith("temp-")) {
+      const tempClient = state.reviewClients?.find(c => c.id === clientId);
+      if (tempClient) {
+        try {
+          const newClient = await window.WLDB.addClient({
+            name: tempClient.name,
+            phone: ""
+          });
+          clientId = newClient.id;
+        } catch (err) {
+          console.error("Failed to dynamically register client on review confirmation:", err);
+          window.WLNotify.error("Failed to register client", err.message);
+          return;
+        }
+      }
+    }
+
     let result;
     if (state.editPaymentType === "goods") {
       result = await window.WLDB.confirmInvoice(state.editPaymentId, {
-        client_id: data.get("client_id"),
+        client_id: clientId,
         amount: data.get("amount"),
         credit_days: data.get("credit_days") ? Number(data.get("credit_days")) : null,
         recorded_at: new Date(`${data.get("date")}T12:00:00`).getTime(),
@@ -612,7 +632,7 @@
       window.WLNotify.success("Goods entry confirmed", money(result.amount));
     } else {
       result = await window.WLDB.confirmPayment(state.editPaymentId, {
-        client_id: data.get("client_id"),
+        client_id: clientId,
         invoice_id: data.get("invoice_id") || null,
         amount: data.get("amount"),
         mode: data.get("mode"),
