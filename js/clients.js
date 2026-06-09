@@ -11,12 +11,34 @@
   document.addEventListener("DOMContentLoaded", initClients);
 
   async function initClients() {
-    await window.WLDB.init();
-    await window.WLUI.initShell("clients");
-    window.WLExport.bindExportButtons();
-    bindEvents();
-    await loadAndRender();
-    await window.WLSSE.start();
+    try {
+      await window.WLDB.init();
+    } catch (e) {
+      console.error("[Clients] WLDB.init failed:", e);
+    }
+    try {
+      await window.WLUI.initShell("clients");
+    } catch (e) {
+      console.error("[Clients] WLUI.initShell failed:", e);
+    }
+    try {
+      if (window.WLExport && window.WLExport.bindExportButtons) {
+        window.WLExport.bindExportButtons();
+      }
+    } catch (e) {}
+    try {
+      bindEvents();
+    } catch (e) {}
+    try {
+      await loadAndRender();
+    } catch (e) {
+      console.error("[Clients] loadAndRender failed:", e);
+    }
+    try {
+      if (window.WLSSE && window.WLSSE.start) {
+        await window.WLSSE.start();
+      }
+    } catch (e) {}
   }
 
   function bindEvents() {
@@ -47,10 +69,26 @@
   }
 
   async function loadAndRender() {
-    state.settings = await window.WLDB.getSettings();
-    state.business = await window.WLDB.getActiveBusiness();
-    state.summaries = await window.WLDB.computeClientSummaries();
-    renderClients();
+    try {
+      state.settings = await window.WLDB.getSettings();
+    } catch (e) {
+      console.error("[Clients] getSettings failed:", e);
+    }
+    try {
+      state.business = await window.WLDB.getActiveBusiness();
+    } catch (e) {
+      console.error("[Clients] getActiveBusiness failed:", e);
+    }
+    try {
+      state.summaries = await window.WLDB.computeClientSummaries();
+    } catch (e) {
+      console.error("[Clients] computeClientSummaries failed:", e);
+    }
+    try {
+      renderClients();
+    } catch (e) {
+      console.error("[Clients] renderClients failed:", e);
+    }
   }
 
   function filteredSummaries() {

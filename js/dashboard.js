@@ -13,12 +13,34 @@
   document.addEventListener("DOMContentLoaded", initDashboard);
 
   async function initDashboard() {
-    await window.WLDB.init();
-    await window.WLUI.initShell("dashboard");
-    window.WLExport.bindExportButtons();
-    bindDashboardEvents();
-    await renderDashboard();
-    await window.WLSSE.start();
+    try {
+      await window.WLDB.init();
+    } catch (e) {
+      console.error("[Dashboard] WLDB.init failed:", e);
+    }
+    try {
+      await window.WLUI.initShell("dashboard");
+    } catch (e) {
+      console.error("[Dashboard] WLUI.initShell failed:", e);
+    }
+    try {
+      if (window.WLExport && window.WLExport.bindExportButtons) {
+        window.WLExport.bindExportButtons();
+      }
+    } catch (e) {}
+    try {
+      bindDashboardEvents();
+    } catch (e) {}
+    try {
+      await renderDashboard();
+    } catch (e) {
+      console.error("[Dashboard] renderDashboard failed:", e);
+    }
+    try {
+      if (window.WLSSE && window.WLSSE.start) {
+        await window.WLSSE.start();
+      }
+    } catch (e) {}
   }
 
   function bindDashboardEvents() {
@@ -38,22 +60,74 @@
   }
 
   async function renderDashboard() {
-    state.settings = await window.WLDB.getSettings();
-    state.business = await window.WLDB.getActiveBusiness();
-    state.summaries = await window.WLDB.computeClientSummaries();
-    state.payments = await window.WLDB.getPayments();
-    const pendingPayments = state.payments
-      .filter((p) => p.status === "pending_review")
-      .map(p => ({ ...p, type: "payment" }));
-    const pendingInvoices = (await window.WLDB.getPendingInvoices())
-      .map(i => ({ ...i, type: "goods" }));
-    state.pending = [...pendingPayments, ...pendingInvoices]
-      .sort((a, b) => Number(b.recorded_at || b.created_at || 0) - Number(a.recorded_at || a.created_at || 0));
-    state.metrics = await window.WLDB.computeMetrics();
-    renderMetrics();
-    renderClientTable();
-    renderLiveFeed();
-    renderPendingReview();
+    try {
+      state.settings = await window.WLDB.getSettings();
+    } catch (e) {
+      console.error("[Dashboard] getSettings failed:", e);
+    }
+    try {
+      state.business = await window.WLDB.getActiveBusiness();
+    } catch (e) {
+      console.error("[Dashboard] getActiveBusiness failed:", e);
+    }
+    try {
+      state.summaries = await window.WLDB.computeClientSummaries();
+    } catch (e) {
+      console.error("[Dashboard] computeClientSummaries failed:", e);
+    }
+    try {
+      state.payments = await window.WLDB.getPayments();
+    } catch (e) {
+      console.error("[Dashboard] getPayments failed:", e);
+    }
+    
+    let pendingPayments = [];
+    try {
+      pendingPayments = state.payments
+        .filter((p) => p.status === "pending_review")
+        .map(p => ({ ...p, type: "payment" }));
+    } catch (e) {}
+
+    let pendingInvoices = [];
+    try {
+      pendingInvoices = (await window.WLDB.getPendingInvoices())
+        .map(i => ({ ...i, type: "goods" }));
+    } catch (e) {
+      console.error("[Dashboard] getPendingInvoices failed:", e);
+    }
+
+    try {
+      state.pending = [...pendingPayments, ...pendingInvoices]
+        .sort((a, b) => Number(b.recorded_at || b.created_at || 0) - Number(a.recorded_at || a.created_at || 0));
+    } catch (e) {}
+
+    try {
+      state.metrics = await window.WLDB.computeMetrics();
+    } catch (e) {
+      console.error("[Dashboard] computeMetrics failed:", e);
+      state.metrics = { totalOutstanding: 0, overdue: 0, dueThisWeek: 0, collectedThisMonth: 0 };
+    }
+
+    try {
+      renderMetrics();
+    } catch (e) {
+      console.error("[Dashboard] renderMetrics failed:", e);
+    }
+    try {
+      renderClientTable();
+    } catch (e) {
+      console.error("[Dashboard] renderClientTable failed:", e);
+    }
+    try {
+      renderLiveFeed();
+    } catch (e) {
+      console.error("[Dashboard] renderLiveFeed failed:", e);
+    }
+    try {
+      renderPendingReview();
+    } catch (e) {
+      console.error("[Dashboard] renderPendingReview failed:", e);
+    }
   }
 
   function renderMetrics() {

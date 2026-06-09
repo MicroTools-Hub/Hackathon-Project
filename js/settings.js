@@ -8,12 +8,58 @@
   document.addEventListener("DOMContentLoaded", initSettings);
 
   async function initSettings() {
-    await window.WLDB.init();
-    await window.WLUI.initShell("settings");
-    window.WLExport.bindExportButtons();
-    bindEvents();
-    await loadAndRender();
-    await window.WLSSE.start();
+    // 1. Instantly render account from localStorage so that username, avatar, and Sign Out render immediately
+    try {
+      renderAccount();
+    } catch (e) {
+      console.error("[Settings] Instant renderAccount failed:", e);
+    }
+
+    // 2. Instantly bind events so buttons (like Sign Out) are active and clickable immediately
+    try {
+      bindEvents();
+    } catch (e) {
+      console.error("[Settings] Instant bindEvents failed:", e);
+    }
+
+    // 3. Initialize WLDB
+    try {
+      await window.WLDB.init();
+    } catch (e) {
+      console.error("[Settings] WLDB init failed:", e);
+    }
+
+    // 4. Initialize UI Shell (topbar business name, select list, themes)
+    try {
+      await window.WLUI.initShell("settings");
+    } catch (e) {
+      console.error("[Settings] WLUI initShell failed:", e);
+    }
+
+    // 5. Bind export buttons
+    try {
+      if (window.WLExport && window.WLExport.bindExportButtons) {
+        window.WLExport.bindExportButtons();
+      }
+    } catch (e) {
+      console.error("[Settings] WLExport bind failed:", e);
+    }
+
+    // 6. Load database records and perform final render
+    try {
+      await loadAndRender();
+    } catch (e) {
+      console.error("[Settings] loadAndRender failed:", e);
+    }
+
+    // 7. Start SSE
+    try {
+      if (window.WLSSE && window.WLSSE.start) {
+        await window.WLSSE.start();
+      }
+    } catch (e) {
+      console.error("[Settings] WLSSE start failed:", e);
+    }
   }
 
   function bindEvents() {
@@ -51,14 +97,48 @@
   let qrPollInterval = null;
 
   async function loadAndRender() {
-    state.business = await window.WLDB.getActiveBusiness();
-    state.settings = await window.WLDB.getSettings();
-    renderAccount();
-    renderBusinessForm();
-    renderTrustedNumbers();
-    renderConnection();
-    if (!qrPollInterval) {
-      startQrPolling();
+    try {
+      state.business = await window.WLDB.getActiveBusiness();
+    } catch (e) {
+      console.error("[Settings] getActiveBusiness failed:", e);
+    }
+    
+    try {
+      state.settings = await window.WLDB.getSettings();
+    } catch (e) {
+      console.error("[Settings] getSettings failed:", e);
+    }
+
+    try {
+      renderAccount();
+    } catch (e) {
+      console.error("[Settings] renderAccount failed:", e);
+    }
+
+    try {
+      renderBusinessForm();
+    } catch (e) {
+      console.error("[Settings] renderBusinessForm failed:", e);
+    }
+
+    try {
+      renderTrustedNumbers();
+    } catch (e) {
+      console.error("[Settings] renderTrustedNumbers failed:", e);
+    }
+
+    try {
+      renderConnection();
+    } catch (e) {
+      console.error("[Settings] renderConnection failed:", e);
+    }
+
+    try {
+      if (!qrPollInterval) {
+        startQrPolling();
+      }
+    } catch (e) {
+      console.error("[Settings] startQrPolling failed:", e);
     }
   }
 
@@ -110,7 +190,7 @@
     const slotNode = document.getElementById("whatsappQrSlot");
     if (!statusNode || !slotNode) return;
 
-    const endpoint = state.settings.sse_endpoint || "";
+    const endpoint = state.settings?.sse_endpoint || "";
     const apiBase = endpoint.replace(/\/sse\/?$/, "");
     if (!apiBase) {
       statusNode.textContent = "Simulator Mode";
@@ -165,10 +245,15 @@
   }
 
   function renderBusinessForm() {
-    document.querySelector("[name='business_name']").value = state.business?.name || "";
-    document.querySelector("[name='business_prefix']").value = state.business?.prefix || "";
-    document.querySelector("[name='currency_symbol']").value = state.settings.currency_symbol || "₹";
-    document.querySelector("[name='theme']").value = state.settings.theme || "dark";
+    const bizNameNode = document.querySelector("[name='business_name']");
+    const bizPrefixNode = document.querySelector("[name='business_prefix']");
+    const currencyNode = document.querySelector("[name='currency_symbol']");
+    const themeNode = document.querySelector("[name='theme']");
+
+    if (bizNameNode) bizNameNode.value = state.business?.name || "";
+    if (bizPrefixNode) bizPrefixNode.value = state.business?.prefix || "";
+    if (currencyNode) currencyNode.value = state.settings?.currency_symbol || "₹";
+    if (themeNode) themeNode.value = state.settings?.theme || "dark";
   }
 
   async function renderTrustedNumbers() {
@@ -198,12 +283,15 @@
   }
 
   function renderConnection() {
-    document.querySelector("[name='sse_endpoint']").value = state.settings.sse_endpoint || "";
+    const sseInput = document.querySelector("[name='sse_endpoint']");
+    if (sseInput) sseInput.value = state.settings?.sse_endpoint || "";
     const log = document.querySelector("[data-connection-log]");
-    const entries = state.settings.connection_log || [];
-    log.innerHTML = entries.length
-      ? entries.map((entry) => `<div class="connection-log-item">${window.WLDB.formatDateContext(entry.at)} · ${escape(entry.message)}</div>`).join("")
-      : `<div class="empty-state">No connection events yet.</div>`;
+    if (log) {
+      const entries = state.settings?.connection_log || [];
+      log.innerHTML = entries.length
+        ? entries.map((entry) => `<div class="connection-log-item">${window.WLDB?.formatDateContext ? window.WLDB.formatDateContext(entry.at) : new Date(entry.at).toLocaleString()} · ${escape(entry.message)}</div>`).join("")
+        : `<div class="empty-state">No connection events yet.</div>`;
+    }
   }
 
   async function saveBusiness() {
@@ -334,13 +422,21 @@
     try {
       if (window.WLAuth) await window.WLAuth.signOut();
     } catch (e) { console.warn("WLAuth.signOut failed:", e); }
+    
+    // Always clear localStorage immediately so the frontend knows they are signed out
     localStorage.removeItem("wl_user");
     localStorage.removeItem("wl_last_sync_time");
+    
     try {
-      await window.WLDB.clearLocalLedgerData();
+      // Clear database non-blocking / asynchronously, don't let it block redirect
+      window.WLDB.clearLocalLedgerData().catch(err => {
+        console.error("Failed to clear local ledger data on logout:", err);
+      });
     } catch (err) {
-      console.error("Failed to clear local ledger data on logout:", err);
+      console.error("Failed to initiate local ledger data clear on logout:", err);
     }
+    
+    // Redirect immediately!
     window.location.href = "login.html";
   }
 

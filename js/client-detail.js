@@ -9,13 +9,35 @@
   document.addEventListener("DOMContentLoaded", initDetail);
 
   async function initDetail() {
-    await window.WLDB.init();
-    await window.WLUI.initShell("clients");
-    window.WLExport.bindExportButtons();
+    try {
+      await window.WLDB.init();
+    } catch (e) {
+      console.error("[ClientDetail] WLDB.init failed:", e);
+    }
+    try {
+      await window.WLUI.initShell("clients");
+    } catch (e) {
+      console.error("[ClientDetail] WLUI.initShell failed:", e);
+    }
+    try {
+      if (window.WLExport && window.WLExport.bindExportButtons) {
+        window.WLExport.bindExportButtons();
+      }
+    } catch (e) {}
     state.clientId = new URLSearchParams(window.location.search).get("id");
-    bindEvents();
-    await loadAndRender();
-    await window.WLSSE.start();
+    try {
+      bindEvents();
+    } catch (e) {}
+    try {
+      await loadAndRender();
+    } catch (e) {
+      console.error("[ClientDetail] loadAndRender failed:", e);
+    }
+    try {
+      if (window.WLSSE && window.WLSSE.start) {
+        await window.WLSSE.start();
+      }
+    } catch (e) {}
   }
 
   function bindEvents() {
@@ -45,20 +67,44 @@
   }
 
   async function loadAndRender() {
-    state.settings = await window.WLDB.getSettings();
-    state.business = await window.WLDB.getActiveBusiness();
+    try {
+      state.settings = await window.WLDB.getSettings();
+    } catch (e) {
+      console.error("[ClientDetail] getSettings failed:", e);
+    }
+    try {
+      state.business = await window.WLDB.getActiveBusiness();
+    } catch (e) {
+      console.error("[ClientDetail] getActiveBusiness failed:", e);
+    }
     if (!state.clientId) {
       renderMissing();
       return;
     }
-    state.ledger = await window.WLDB.getClientLedger(state.clientId);
-    if (!state.ledger.client) {
+    try {
+      state.ledger = await window.WLDB.getClientLedger(state.clientId);
+    } catch (e) {
+      console.error("[ClientDetail] getClientLedger failed:", e);
+    }
+    if (!state.ledger || !state.ledger.client) {
       renderMissing();
       return;
     }
-    renderHero();
-    renderInvoices();
-    renderTimeline();
+    try {
+      renderHero();
+    } catch (e) {
+      console.error("[ClientDetail] renderHero failed:", e);
+    }
+    try {
+      renderInvoices();
+    } catch (e) {
+      console.error("[ClientDetail] renderInvoices failed:", e);
+    }
+    try {
+      renderTimeline();
+    } catch (e) {
+      console.error("[ClientDetail] renderTimeline failed:", e);
+    }
   }
 
   function renderMissing() {
