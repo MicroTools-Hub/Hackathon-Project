@@ -19,20 +19,54 @@
     });
   }
 
+  let detectedApiBaseUrl = null;
+
+  async function probeBackend(port) {
+    if (!port) return null;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 400);
+      const url = `http://127.0.0.1:${port}`;
+      const res = await fetch(`${url}/api/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) return url;
+    } catch (e) {}
+    return null;
+  }
+
   async function getApiBaseUrl() {
+    if (detectedApiBaseUrl) return detectedApiBaseUrl;
+
     if (isLocalHost) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600);
-        const res = await fetch("http://127.0.0.1:3000/api/health", { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) return "http://127.0.0.1:3000";
-      } catch (e) {}
+      // 1. Try current window port
+      if (window.location.port) {
+        const url = await probeBackend(window.location.port);
+        if (url) {
+          detectedApiBaseUrl = url;
+          return url;
+        }
+      }
+      // 2. Try port 3000
+      const url3000 = await probeBackend("3000");
+      if (url3000) {
+        detectedApiBaseUrl = url3000;
+        return url3000;
+      }
+      // 3. Try port 8080
+      const url8080 = await probeBackend("8080");
+      if (url8080) {
+        detectedApiBaseUrl = url8080;
+        return url8080;
+      }
     }
 
-    const settings = await getSettings();
-    if (!settings || !settings.sse_endpoint) return "";
-    return settings.sse_endpoint.replace(/\/sse\/?$/, "");
+    const db = await openDatabase();
+    const settings = await db.get("settings", "global");
+    if (settings && settings.sse_endpoint) {
+      const url = settings.sse_endpoint.replace(/\/sse\/?$/, "");
+      if (url) return url;
+    }
+    return "";
   }
 
   async function apiFetch(path, options = {}) {
@@ -298,9 +332,11 @@
     await seedPromise;
     const db = await openDatabase();
     const settings = await db.get("settings", "global");
-    const resolvedDefaultEndpoint = isLocalHost
-      ? "http://127.0.0.1:3000/sse"
-      : DEFAULT_SSE_ENDPOINT;
+    let resolvedDefaultEndpoint = DEFAULT_SSE_ENDPOINT;
+    if (isLocalHost) {
+      const baseUrl = await getApiBaseUrl();
+      resolvedDefaultEndpoint = baseUrl ? `${baseUrl}/sse` : "http://127.0.0.1:3000/sse";
+    }
     if (settings) {
       // If the endpoint is pointing to the old trycloudflare, migrate it to the active endpoint
       if (settings.sse_endpoint && settings.sse_endpoint.includes("trycloudflare.com")) {
@@ -1190,6 +1226,7 @@
 
   window.WLDB = {
     init,
+    getApiBaseUrl,
     pullSync,
     uuid,
     getSettings,

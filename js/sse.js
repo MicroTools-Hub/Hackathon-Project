@@ -12,11 +12,10 @@
 
     let endpoint = settings.sse_endpoint;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600);
-      const res = await fetch("http://127.0.0.1:3000/api/health", { signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) endpoint = "http://127.0.0.1:3000/sse";
+      const baseUrl = await window.WLDB.getApiBaseUrl();
+      if (baseUrl) {
+        endpoint = `${baseUrl}/sse`;
+      }
     } catch (e) {}
 
     if (endpoint && navigator.onLine) {

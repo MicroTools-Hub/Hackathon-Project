@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 import { config } from "./config.js";
@@ -38,6 +40,11 @@ sseManager.setSnapshotProvider(() => ({
 const apiRouter = createApiRouter();
 app.use("/", apiRouter);
 app.use("/api", apiRouter);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// Serve static frontend files from the root directory
+app.use(express.static(path.resolve(__dirname, "..")));
 
 scheduleDailyReminders();
 

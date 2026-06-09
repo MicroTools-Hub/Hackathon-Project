@@ -480,7 +480,8 @@
       // 2. Initialize default endpoint in URL input
       await window.WLDB.init();
       const settings = await window.WLDB.getSettings();
-      sseEndpoint = settings.sse_endpoint || "http://127.0.0.1:3000/sse";
+      const baseUrl = await window.WLDB.getApiBaseUrl();
+      sseEndpoint = settings.sse_endpoint || (baseUrl ? `${baseUrl}/sse` : "http://127.0.0.1:3000/sse");
       document.getElementById("backendUrl").value = sseEndpoint;
 
       // 3. Pre-bind form inputs
