@@ -334,7 +334,9 @@
   }
 
   async function confirmReviewPayment(payment) {
-    if (!payment.client_id) {
+    const realClients = await window.WLDB.getClients();
+    const clientExists = realClients.some(c => c.id === payment.client_id);
+    if (!clientExists || !payment.client_id) {
       await openReviewModal(payment);
       return;
     }
@@ -601,20 +603,21 @@
     const data = new FormData(form);
 
     let clientId = data.get("client_id");
-    if (clientId && clientId.startsWith("temp-")) {
-      const tempClient = state.reviewClients?.find(c => c.id === clientId);
-      if (tempClient) {
-        try {
-          const newClient = await window.WLDB.addClient({
-            name: tempClient.name,
-            phone: ""
-          });
-          clientId = newClient.id;
-        } catch (err) {
-          console.error("Failed to dynamically register client on review confirmation:", err);
-          window.WLNotify.error("Failed to register client", err.message);
-          return;
-        }
+    const realClients = await window.WLDB.getClients();
+    const clientExists = realClients.some(c => c.id === clientId);
+    if (!clientExists && clientId) {
+      const selectNode = modal.querySelector("[name='client_id']");
+      const clientName = selectNode.options[selectNode.selectedIndex]?.text || "Unknown Client";
+      try {
+        const newClient = await window.WLDB.addClient({
+          name: clientName,
+          phone: ""
+        });
+        clientId = newClient.id;
+      } catch (err) {
+        console.error("Failed to dynamically register client on review confirmation:", err);
+        window.WLNotify.error("Failed to register client", err.message);
+        return;
       }
     }
 
