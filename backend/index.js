@@ -67,6 +67,14 @@ function shutdown(signal) {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
+// Prevent any single uncaught error from taking down the entire server
+process.on("uncaughtException", (error) => {
+  logger.error("Uncaught exception (server kept alive)", { error: error.message, stack: error.stack });
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection (server kept alive)", { reason: String(reason) });
+});
+
 function startDemoPaymentTimer() {
   const timer = setInterval(() => {
     const payment = createDemoPayment();
