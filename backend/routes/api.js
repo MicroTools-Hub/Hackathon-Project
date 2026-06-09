@@ -412,7 +412,7 @@ export function createApiRouter() {
     }
     
     updateStatus();
-    setInterval(updateStatus, 2000);
+    setInterval(updateStatus, 1000);
   </script>
 </body>
 </html>`);

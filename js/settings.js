@@ -161,7 +161,7 @@
 
   function startQrPolling() {
     renderWhatsAppConnection();
-    qrPollInterval = setInterval(renderWhatsAppConnection, 3000);
+    qrPollInterval = setInterval(renderWhatsAppConnection, 1000);
   }
 
   function renderBusinessForm() {

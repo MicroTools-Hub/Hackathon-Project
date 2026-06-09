@@ -13,7 +13,7 @@
   const SYNC_TABLES  = ['businesses', 'clients', 'invoices', 'payments'];
 
   const ALLOWED_FIELDS = {
-    businesses: ['id', 'name', 'prefix', 'owner_number', 'trusted_numbers', 'trusted_number_meta', 'created_at'],
+    businesses: ['id', 'name', 'prefix', 'owner_number', 'created_at'],
     clients: ['id', 'business_id', 'name', 'phone', 'credit_limit', 'payment_cycle_days', 'created_at'],
     invoices: ['id', 'business_id', 'client_id', 'amount', 'due_date', 'status', 'notes', 'source', 'source_number', 'raw_input', 'confidence', 'transaction_id', 'business_prefix', 'client_name', 'created_at'],
     payments: ['id', 'business_id', 'client_id', 'invoice_id', 'amount', 'mode', 'recorded_at', 'source', 'source_number', 'raw_input', 'confidence', 'status', 'utr_number', 'notes', 'business_prefix', 'client_name', 'match_score', 'created_at']
