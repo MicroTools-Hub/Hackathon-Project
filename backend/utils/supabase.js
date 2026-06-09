@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import ws from "ws";
 import { config } from "../config.js";
 import { logger } from "./logger.js";
 
@@ -14,7 +15,10 @@ export const supabase = isConfigured
   ? createClient(
       config.supabase.url,
       config.supabase.serviceRoleKey,
-      { auth: { autoRefreshToken: false, persistSession: false } }
+      {
+        auth: { autoRefreshToken: false, persistSession: false },
+        realtime: { transport: ws }
+      }
     )
   : null;
 

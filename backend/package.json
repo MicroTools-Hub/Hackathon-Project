@@ -30,6 +30,7 @@
     "qrcode": "latest",
     "qrcode-terminal": "latest",
     "sharp": "latest",
-    "uuid": "latest"
+    "uuid": "latest",
+    "ws": "latest"
   }
 }
