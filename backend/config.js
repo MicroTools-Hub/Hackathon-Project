@@ -26,7 +26,7 @@ function resolveFromBackend(value) {
 export const config = {
   env: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 3000),
-  host: process.env.HOST || "127.0.0.1",
+  host: process.env.HOST || "0.0.0.0",
   frontendOrigin: process.env.FRONTEND_ORIGIN || process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
   frontendOrigins: list(process.env.FRONTEND_ORIGIN || process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL),
   frontendUrl: process.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
