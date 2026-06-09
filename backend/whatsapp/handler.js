@@ -69,7 +69,11 @@ async function handleSingleMessage(sock, message) {
       logger.info("Resolved LID to phone", { lid: senderJid.split("@")[0], phone: resolved });
       senderJid = resolved + "@s.whatsapp.net";
     } else {
-      logger.warn("Could not resolve LID to phone after lazy sync", { lid: senderJid });
+      logger.warn("Could not resolve LID to phone after lazy sync", {
+        lid: senderJid,
+        messageKey: JSON.stringify(message?.key),
+        message: JSON.stringify(message)
+      });
     }
   }
 

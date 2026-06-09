@@ -3,7 +3,9 @@ import path from "node:path";
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
-  isLidUser
+  isLidUser,
+  USyncQuery,
+  USyncUser
 } from "@whiskeysockets/baileys";
 import { useAuthState, clearSavedSession } from "../utils/waSession.js";
 import qrcode from "qrcode-terminal";
@@ -75,6 +77,33 @@ export function resolveLidToPhone(lidJidOrDigits) {
 
 export function getLidMapSize() { return lidToPhone.size; }
 
+export async function fetchLidsForPhones(sock, phoneJids) {
+  if (!sock) return [];
+  try {
+    const usyncQuery = new USyncQuery().withLIDProtocol().withContext('background');
+    let added = 0;
+    for (const jid of phoneJids) {
+      if (isLidUser(jid)) {
+        continue;
+      }
+      usyncQuery.withUser(new USyncUser().withId(jid));
+      added++;
+    }
+    if (added === 0) return [];
+    
+    const results = await sock.executeUSyncQuery(usyncQuery);
+    if (results && results.list) {
+      const mappings = results.list
+        .filter(a => !!a.lid)
+        .map(({ lid, id }) => ({ pn: id, lid: lid }));
+      return mappings;
+    }
+  } catch (err) {
+    logger.warn("Failed to fetch LIDs from USync query", { error: err.message });
+  }
+  return [];
+}
+
 export async function syncLidsForTrustedNumbers(sock) {
   if (!sock) {
     logger.warn("Cannot sync LIDs: socket is not initialized");
@@ -85,23 +114,46 @@ export async function syncLidsForTrustedNumbers(sock) {
   const numbersToSync = [...new Set([ownerNumber, ...trustedNumbers].filter(Boolean))];
   
   logger.info("Syncing LIDs for trusted numbers", { numbersToSync });
+  
+  // 1. Primary Sync: query LIDs directly via USync
+  try {
+    const jidsToSync = numbersToSync.map(phone => {
+      const digits = phone.replace(/\D/g, "");
+      return `${digits}@s.whatsapp.net`;
+    });
+    const mappings = await fetchLidsForPhones(sock, jidsToSync);
+    logger.info("USync LID query mappings resolved", { mappings });
+    for (const mapping of mappings) {
+      if (mapping.pn && mapping.lid) {
+        const phoneDigits = mapping.pn.split("@")[0].split(":")[0];
+        const lidDigits = mapping.lid.split("@")[0].split(":")[0];
+        lidToPhone.set(lidDigits, phoneDigits);
+        logger.info("Mapped trusted number LID via USync", { phone: phoneDigits, lid: lidDigits });
+      }
+    }
+  } catch (err) {
+    logger.warn("Failed to sync LIDs using USync", { error: err.message });
+  }
+
+  // 2. Fallback Sync: use onWhatsApp (as fallback only)
   for (const phone of numbersToSync) {
     try {
       const digits = phone.replace(/\D/g, "");
       const results = await sock.onWhatsApp(digits);
       if (results && results.length > 0) {
         const result = results[0];
+        logger.info("onWhatsApp fallback result details", { phone, result: JSON.stringify(result) });
         if (result.exists && result.lid) {
           const lidDigits = result.lid.split("@")[0].split(":")[0];
           const phoneDigits = result.jid.split("@")[0].split(":")[0];
-          lidToPhone.set(lidDigits, phoneDigits);
-          logger.info("Mapped trusted number LID", { phone: phoneDigits, lid: lidDigits });
-        } else {
-          logger.info("Number exists but no LID returned or does not exist", { phone, exists: result.exists });
+          if (!lidToPhone.has(lidDigits)) {
+            lidToPhone.set(lidDigits, phoneDigits);
+            logger.info("Mapped trusted number LID via onWhatsApp fallback", { phone: phoneDigits, lid: lidDigits });
+          }
         }
       }
     } catch (err) {
-      logger.warn("Failed to sync LID for trusted number", { phone, error: err.message });
+      logger.warn("Failed to sync LID for trusted number via onWhatsApp fallback", { phone, error: err.message });
     }
   }
 }
