@@ -54,12 +54,22 @@ async function handleSingleMessage(sock, message) {
   /* ── Resolve LID JIDs to phone numbers ── */
   let senderJid = isGroup ? (message.key.participant || remoteJid) : remoteJid;
   if (!message.key?.fromMe && isLidUser(senderJid)) {
-    const resolved = resolveLidToPhone(senderJid);
+    let resolved = resolveLidToPhone(senderJid);
+    if (!resolved) {
+      logger.info("Unresolved sender LID user encountered, performing lazy sync...", { lid: senderJid });
+      try {
+        const { syncLidsForTrustedNumbers } = await import("./client.js");
+        await syncLidsForTrustedNumbers(sock);
+        resolved = resolveLidToPhone(senderJid);
+      } catch (err) {
+        logger.error("Failed to perform lazy LID sync for sender JID", { error: err.message });
+      }
+    }
     if (resolved) {
       logger.info("Resolved LID to phone", { lid: senderJid.split("@")[0], phone: resolved });
       senderJid = resolved + "@s.whatsapp.net";
     } else {
-      logger.warn("Could not resolve LID to phone", { lid: senderJid });
+      logger.warn("Could not resolve LID to phone after lazy sync", { lid: senderJid });
     }
   }
 
@@ -68,7 +78,17 @@ async function handleSingleMessage(sock, message) {
     : senderJid;
   let resolvedSourceJid = sourceJid;
   if (isLidUser(sourceJid)) {
-    const resolved = resolveLidToPhone(sourceJid);
+    let resolved = resolveLidToPhone(sourceJid);
+    if (!resolved) {
+      logger.info("Unresolved source LID user encountered, performing lazy sync...", { lid: sourceJid });
+      try {
+        const { syncLidsForTrustedNumbers } = await import("./client.js");
+        await syncLidsForTrustedNumbers(sock);
+        resolved = resolveLidToPhone(sourceJid);
+      } catch (err) {
+        logger.error("Failed to perform lazy LID sync for source JID", { error: err.message });
+      }
+    }
     if (resolved) {
       resolvedSourceJid = resolved + "@s.whatsapp.net";
     }

@@ -75,6 +75,37 @@ export function resolveLidToPhone(lidJidOrDigits) {
 
 export function getLidMapSize() { return lidToPhone.size; }
 
+export async function syncLidsForTrustedNumbers(sock) {
+  if (!sock) {
+    logger.warn("Cannot sync LIDs: socket is not initialized");
+    return;
+  }
+  const trustedNumbers = store.listTrustedNumbers();
+  const ownerNumber = store.getBusiness()?.owner_number;
+  const numbersToSync = [...new Set([ownerNumber, ...trustedNumbers].filter(Boolean))];
+  
+  logger.info("Syncing LIDs for trusted numbers", { numbersToSync });
+  for (const phone of numbersToSync) {
+    try {
+      const digits = phone.replace(/\D/g, "");
+      const results = await sock.onWhatsApp(digits);
+      if (results && results.length > 0) {
+        const result = results[0];
+        if (result.exists && result.lid) {
+          const lidDigits = result.lid.split("@")[0].split(":")[0];
+          const phoneDigits = result.jid.split("@")[0].split(":")[0];
+          lidToPhone.set(lidDigits, phoneDigits);
+          logger.info("Mapped trusted number LID", { phone: phoneDigits, lid: lidDigits });
+        } else {
+          logger.info("Number exists but no LID returned or does not exist", { phone, exists: result.exists });
+        }
+      }
+    } catch (err) {
+      logger.warn("Failed to sync LID for trusted number", { phone, error: err.message });
+    }
+  }
+}
+
 globalThis.wholesaleLedgerWhatsAppStatus ||= { connected: false, qr_pending: false };
 
 export function getWhatsAppSocket() {
@@ -158,6 +189,11 @@ async function handleConnectionUpdate(update) {
     logger.info("WhatsApp connected");
     store.addConnectionEvent("connected", "WhatsApp connected");
     sseManager.whatsappStatus("connected");
+
+    // Sync LIDs for trusted numbers on connection open
+    syncLidsForTrustedNumbers(socket).catch((err) => {
+      logger.error("Failed to sync LIDs for trusted numbers on connection open", { error: err.message });
+    });
   }
 
   if (connection === "close") {
