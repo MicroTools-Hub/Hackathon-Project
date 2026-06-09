@@ -5,7 +5,7 @@
   const isLocalHost = ["localhost", "127.0.0.1", ""].includes(window.location.hostname);
   const DEFAULT_SSE_ENDPOINT = isLocalHost
     ? "http://127.0.0.1:3000/sse"
-    : "https://smirk-blighted-marvelous.ngrok-free.dev/sse";
+    : "https://hackathon-project-production-4144.up.railway.app/sse";
   const STORES = ["businesses", "clients", "invoices", "payments", "settings", "sync_queue"];
   let dbPromise;
   let seedPromise;
