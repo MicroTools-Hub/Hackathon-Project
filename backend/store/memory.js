@@ -194,9 +194,23 @@ async function refreshTrustedNumbersCache() {
   if (!rows) return false; // Supabase error — keep existing cache
 
   if (rows.length === 0) {
-    // Table is empty for this business — seed it from the .env fallback if we have numbers
+    // Table is empty for this business — seed from .env fallback IF the business
+    // actually exists in Supabase (otherwise the FK constraint will reject the insert)
     const fallback = config.trustedNumbers.map(normalizePhone).filter(Boolean);
-    if (fallback.length > 0) {
+    if (fallback.length > 0 && business?.id) {
+      // Check if business exists in Supabase before seeding to avoid FK violation
+      const { supabase } = await import("../utils/supabase.js");
+      if (supabase) {
+        const { data: bizRow } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("id", business.id)
+          .maybeSingle();
+        if (!bizRow) {
+          // Business not in Supabase yet — skip seeding, keep in-memory numbers
+          return false;
+        }
+      }
       console.info("[memory] Supabase trusted_numbers table is empty for this business. Seeding from TRUSTED_NUMBERS env.");
       for (const phone of fallback) {
         await upsertTrustedNumberInSupabase(business.id, {
